@@ -1607,9 +1607,24 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             </div>
 
             <form onSubmit={handleSaveField} className="p-5 space-y-4">
-              {/* Field Label */}
+              {/* Field Label & Required Toggle */}
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-300">Nama Field</label>
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-300">Nama Field</label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={!!editingField?.is_required}
+                      onChange={(e) => {
+                        if (editingField) {
+                          setEditingField({ ...editingField, is_required: e.target.checked });
+                        }
+                      }}
+                      className="w-4 h-4 accent-indigo-500 rounded cursor-pointer"
+                    />
+                    <span className="text-xs font-bold text-amber-400">Wajib Diisi (Required)</span>
+                  </label>
+                </div>
                 <input
                   type="text"
                   required
