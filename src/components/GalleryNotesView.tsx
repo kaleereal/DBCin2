@@ -39,9 +39,13 @@ export const GalleryNotesView: React.FC<GalleryNotesViewProps> = ({
 
   const effectiveArtists = artists.length > 0 ? artists : getStoredArtists();
 
-  useEffect(() => {
+  const refreshNotes = () => {
     setNotes(getStoredGalleryNotes());
-  }, []);
+  };
+
+  useEffect(() => {
+    refreshNotes();
+  }, [selectedNoteId, isModalOpen]);
 
   const activeStandaloneNote = selectedNoteId
     ? notes.find((n) => n.id === selectedNoteId)
@@ -67,12 +71,14 @@ export const GalleryNotesView: React.FC<GalleryNotesViewProps> = ({
     }
     setNotes(updated);
     saveGalleryNotes(updated);
+    refreshNotes();
   };
 
   const handleDeleteNote = (noteId: string) => {
     const updated = notes.filter((n) => n.id !== noteId);
     setNotes(updated);
     saveGalleryNotes(updated);
+    refreshNotes();
   };
 
   // Quick Action: Duplikat Catatan (Poin 4.4)
@@ -87,6 +93,7 @@ export const GalleryNotesView: React.FC<GalleryNotesViewProps> = ({
     const updated = [duplicated, ...notes];
     setNotes(updated);
     saveGalleryNotes(updated);
+    refreshNotes();
   };
 
   const filteredNotes = notes.filter(
@@ -385,24 +392,33 @@ export const GalleryNotesView: React.FC<GalleryNotesViewProps> = ({
                   <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                     <button
                       type="button"
-                      onClick={() => handleDuplicateNote(note)}
-                      className="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-indigo-300 transition"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDuplicateNote(note);
+                      }}
+                      className="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-indigo-300 transition cursor-pointer"
                       title="Duplikat Catatan"
                     >
                       <Copy className="w-3.5 h-3.5" />
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleOpenEdit(note)}
-                      className="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-amber-300 transition"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenEdit(note);
+                      }}
+                      className="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-amber-300 transition cursor-pointer"
                       title="Edit / Baca Catatan"
                     >
                       <Edit2 className="w-3.5 h-3.5" />
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleDeleteNote(note.id)}
-                      className="p-1.5 rounded-lg bg-slate-800/80 text-slate-500 hover:text-rose-400 transition"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteNote(note.id);
+                      }}
+                      className="p-1.5 rounded-lg bg-slate-800/80 text-slate-500 hover:text-rose-400 transition cursor-pointer"
                       title="Hapus Catatan"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
