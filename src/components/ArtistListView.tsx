@@ -10,6 +10,8 @@ interface ArtistListViewProps {
   onSelectArtist: (artistId: string) => void;
   onOpenCreateArtist: () => void;
   onDeleteArtist?: (artist: Artist) => void;
+  filterRole?: string | null;
+  onClearRoleFilter?: () => void;
 }
 
 export const ArtistListView: React.FC<ArtistListViewProps> = ({
@@ -18,6 +20,8 @@ export const ArtistListView: React.FC<ArtistListViewProps> = ({
   onSelectArtist,
   onOpenCreateArtist,
   onDeleteArtist,
+  filterRole,
+  onClearRoleFilter,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>(() => getArtistViewMode());
@@ -33,6 +37,12 @@ export const ArtistListView: React.FC<ArtistListViewProps> = ({
 
   const filteredArtists = useMemo(() => {
     return artists.filter((a) => {
+      if (filterRole && filterRole.trim()) {
+        const role = a.textFields?.['Peran Utama'] || '';
+        if (!role.toLowerCase().includes(filterRole.toLowerCase())) {
+          return false;
+        }
+      }
       if (!searchQuery.trim()) return true;
       return (
         a.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -40,7 +50,7 @@ export const ArtistListView: React.FC<ArtistListViewProps> = ({
         a.textFields?.['Peran Utama']?.toLowerCase().includes(searchQuery.toLowerCase())
       );
     });
-  }, [artists, searchQuery]);
+  }, [artists, searchQuery, filterRole]);
 
   return (
     <div id="artist-list-view" className="space-y-4 pb-24 animate-in fade-in">
@@ -66,6 +76,25 @@ export const ArtistListView: React.FC<ArtistListViewProps> = ({
           <span>Tambah</span>
         </button>
       </div>
+
+      {/* Role Filter Active Tag Header (Poin 6A) */}
+      {filterRole && (
+        <div className="flex items-center justify-between p-2.5 rounded-xl bg-indigo-950/80 border border-indigo-700/60 text-xs text-indigo-200">
+          <div className="flex items-center gap-2">
+            <span className="font-bold">Filter Peran Utama:</span>
+            <span className="px-2 py-0.5 rounded-md bg-indigo-600 text-white font-extrabold">{filterRole}</span>
+          </div>
+          {onClearRoleFilter && (
+            <button
+              type="button"
+              onClick={onClearRoleFilter}
+              className="text-[11px] font-bold text-slate-400 hover:text-white underline cursor-pointer"
+            >
+              Hapus Filter
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Search Bar & View Toggle */}
       <div className="flex items-center gap-2">

@@ -23,7 +23,13 @@ import {
   VideoMetadata,
 } from '../types';
 import { fetchUrlMetadata } from '../utils/metadataFetcher';
-import { calculateOverallRating, getStoredRatingTemplates, getStoredVideos } from '../utils/storage';
+import {
+  calculateOverallRating,
+  getStoredRatingTemplates,
+  getStoredVideos,
+  getStoredRoleWeights,
+  getDynamicRoleHistory,
+} from '../utils/storage';
 import { RatingBadge } from './RatingBadge';
 
 interface VideoFormModalProps {
@@ -48,6 +54,7 @@ export const VideoFormModal: React.FC<VideoFormModalProps> = ({
   // Form State
   const [url, setUrl] = useState('');
   const [title, setTitle] = useState('');
+  const [releaseDate, setReleaseDate] = useState('');
   const [metadata, setMetadata] = useState<VideoMetadata | undefined>(undefined);
   const [isFetchingMeta, setIsFetchingMeta] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -62,36 +69,22 @@ export const VideoFormModal: React.FC<VideoFormModalProps> = ({
   // Artist Select state & Bottom Sheet
   const [selectedArtistIds, setSelectedArtistIds] = useState<string[]>([]);
   const [artistRoles, setArtistRoles] = useState<Record<string, string>>({});
+  const [artistPerformances, setArtistPerformances] = useState<Record<string, number>>({});
   const [isArtistSheetOpen, setIsArtistSheetOpen] = useState(false);
   const [artistSearchQuery, setArtistSearchQuery] = useState('');
   const [newArtistName, setNewArtistName] = useState('');
 
-  // History of roles for autocomplete / suggestions
+  // Dynamic History of roles for autocomplete / suggestions from existing videos
   const roleSuggestions = useMemo(() => {
-    const set = new Set<string>([
-      'Artis Utama',
-      'Sutradara',
-      'Aktor',
-      'Aktris',
-      'Cameo',
-      'Produser',
-      'Penulis Naskah',
-      'Sinematografer',
-    ]);
-    try {
-      const existingVideos = getStoredVideos();
-      existingVideos.forEach((v) => {
-        if (v.artistRoles) {
-          Object.values(v.artistRoles).forEach((r) => {
-            const t = r?.trim();
-            if (t) set.add(t);
-          });
-        }
-      });
-    } catch (e) {
-      console.error(e);
-    }
-    return Array.from(set);
+    return getDynamicRoleHistory();
+  }, [isOpen]);
+
+  // Master role weights map for quick lookups of S
+  const roleWeightsMap = useMemo(() => {
+    const weights = getStoredRoleWeights();
+    const map = new Map<string, number>();
+    weights.forEach((w) => map.set(w.roleName.toLowerCase().trim(), w.weight));
+    return map;
   }, [isOpen]);
 
   // Single choice and Multi choice values
@@ -105,11 +98,12 @@ export const VideoFormModal: React.FC<VideoFormModalProps> = ({
   // Live Overall Rating
   const [overallRating, setOverallRating] = useState(0);
 
-  // Resolve folders from master settings template while preserving user scores
-  function getResolvedRatingFolders(existing?: RatingFolder[]): RatingFolder[] {
+  // Resolve folders from master settings template
+  // IMPORTANT: For NEW video creation, enforce Default 0 rule!
+  function getResolvedRatingFolders(existing?: RatingFolder[], isNewVideo?: boolean): RatingFolder[] {
     const templates = getStoredRatingTemplates();
 
-    if (!existing || existing.length === 0) {
+    if (isNewVideo || !existing || existing.length === 0) {
       return templates.map((tmpl) => ({
         id: tmpl.id,
         name: tmpl.name,
@@ -117,12 +111,12 @@ export const VideoFormModal: React.FC<VideoFormModalProps> = ({
           id: it.id,
           name: it.name,
           description: it.description,
-          score: it.defaultScore ?? 80,
+          score: isNewVideo ? 0 : (it.defaultScore ?? 0), // Aturan Default 0
         })),
       }));
     }
 
-    // Preserve existing scores and align with master template
+    // Preserve existing saved scores for EDIT
     return templates.map((tmpl) => {
       const existingFolder = existing.find(
         (f) => f.id === tmpl.id || f.name.toLowerCase() === tmpl.name.toLowerCase()
@@ -142,38 +136,47 @@ export const VideoFormModal: React.FC<VideoFormModalProps> = ({
             score:
               typeof existingItem?.score === 'number'
                 ? existingItem.score
-                : (itemTmpl.defaultScore ?? 80),
+                : 0,
           };
         }),
       };
     });
   }
 
+  // Helper to get default role weight S
+  const getRoleWeightS = (roleName: string) => {
+    const trimmed = roleName.trim().toLowerCase();
+    return roleWeightsMap.has(trimmed) ? roleWeightsMap.get(trimmed)! : 100;
+  };
+
   // Initialize or Reset form on open/change
   useEffect(() => {
     if (initialVideo) {
       setUrl(initialVideo.url || '');
       setTitle(initialVideo.title || '');
+      setReleaseDate(initialVideo.releaseDate || '');
       setMetadata(initialVideo.metadata);
       setNotes(initialVideo.notes || '');
       setIsNotesOpen(!!initialVideo.notes);
-      setRatingFolders(getResolvedRatingFolders(initialVideo.ratingFolders));
+      setRatingFolders(getResolvedRatingFolders(initialVideo.ratingFolders, false));
       setSelectedArtistIds(initialVideo.artistIds || []);
       setArtistRoles(initialVideo.artistRoles || {});
+      setArtistPerformances(initialVideo.artistPerformances || {});
       setSingleChoices(initialVideo.singleChoices || {});
       setMultiChoices(initialVideo.multiChoices || {});
       setCustomTextFields(initialVideo.customFields || {});
     } else {
-      // New Video: load clean structure from master settings template
+      // NEW Video: load clean structure with ALL numeric fields defaulted to 0
       setUrl('');
       setTitle('');
+      setReleaseDate(new Date().toISOString().slice(0, 10)); // Today's date default for releaseDate
       setMetadata(undefined);
       setNotes('');
       setIsNotesOpen(false);
-      const defaultFolders = getResolvedRatingFolders();
-      setRatingFolders(defaultFolders);
+      setRatingFolders(getResolvedRatingFolders(undefined, true));
       setSelectedArtistIds([]);
       setArtistRoles({});
+      setArtistPerformances({});
       setSingleChoices({});
       setMultiChoices({});
       setCustomTextFields({});
@@ -235,10 +238,23 @@ export const VideoFormModal: React.FC<VideoFormModalProps> = ({
       setSelectedArtistIds(selectedArtistIds.filter((id) => id !== artistId));
     } else {
       setSelectedArtistIds([...selectedArtistIds, artistId]);
-      if (!artistRoles[artistId]) {
+      const defaultRole = 'Artis Utama';
+      const weightS = getRoleWeightS(defaultRole);
+
+      if (artistRoles[artistId] === undefined) {
         setArtistRoles((prev) => ({
           ...prev,
-          [artistId]: 'Artis Utama',
+          [artistId]: defaultRole,
+        }));
+      }
+
+      // Default slider Nilai Performa (P):
+      // - Saat Create Video BARU: 0 (Aturan Default 0)
+      // - Saat memilih artis dan status peran: slider diisi sebesar Bobot Status Peran (S)
+      if (artistPerformances[artistId] === undefined) {
+        setArtistPerformances((prev) => ({
+          ...prev,
+          [artistId]: initialVideo ? weightS : 0, // 0 for new video create
         }));
       }
     }
@@ -280,12 +296,14 @@ export const VideoFormModal: React.FC<VideoFormModalProps> = ({
     const payload: Partial<Video> = {
       title: title.trim(),
       url: url.trim(),
+      releaseDate: releaseDate || new Date().toISOString().slice(0, 10),
       metadata,
       notes: notes.trim(),
       ratingFolders,
       overallRating,
       artistIds: selectedArtistIds,
       artistRoles,
+      artistPerformances,
       singleChoices,
       multiChoices,
       customFields: customTextFields,
@@ -469,23 +487,41 @@ export const VideoFormModal: React.FC<VideoFormModalProps> = ({
               );
             }
 
-            // 2. TITLE FIELD
+            // 2. TITLE FIELD & RELEASE DATE
             if (field.type === 'text' && field.key === 'title') {
               return (
-                <div key={field.id} className="space-y-2">
-                  <label className="text-sm font-bold text-slate-200 flex items-center gap-1.5">
-                    <span>{field.label}</span>
-                    {field.required && <span className="text-rose-400">*</span>}
-                  </label>
-                  <p className="text-xs text-slate-400">{field.description}</p>
-                  <input
-                    type="text"
-                    required
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    placeholder="Contoh: Oppenheimer Official Trailer (4K)"
-                    className="w-full min-h-[48px] px-3.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
+                <div key={field.id} className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-slate-200 flex items-center gap-1.5">
+                      <span>{field.label}</span>
+                      {field.required && <span className="text-rose-400">*</span>}
+                    </label>
+                    <p className="text-xs text-slate-400">{field.description}</p>
+                    <input
+                      type="text"
+                      required
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      placeholder="Contoh: Oppenheimer Official Trailer (4K)"
+                      className="w-full min-h-[48px] px-3.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+
+                  {/* Mandatory Tanggal Rilis Field */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-slate-200 flex items-center gap-1.5">
+                      <span>Tanggal Rilis Video</span>
+                      <span className="text-rose-400">*</span>
+                    </label>
+                    <p className="text-xs text-slate-400">Tanggal penayangan atau rilis resmi video ini.</p>
+                    <input
+                      type="date"
+                      required
+                      value={releaseDate}
+                      onChange={(e) => setReleaseDate(e.target.value)}
+                      className="w-full min-h-[48px] px-3.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
                 </div>
               );
             }
@@ -678,18 +714,21 @@ export const VideoFormModal: React.FC<VideoFormModalProps> = ({
                   </div>
                   <p className="text-xs text-slate-400">{field.description}</p>
 
-                  {/* Selected Artists Cards with Role Status and History Autocomplete */}
+                  {/* Selected Artists Cards with Role Status and Slider Nilai Performa (P) */}
                   {selectedArtists.length > 0 && (
                     <div className="space-y-2.5 pt-1">
                       {selectedArtists.map((artist) => {
-                        const currentRole = artistRoles[artist.id] || 'Artis Utama';
+                        const currentRole = artistRoles[artist.id] !== undefined ? artistRoles[artist.id] : '';
+                        const weightS = getRoleWeightS(currentRole);
+                        // Default performance P
+                        const currentP = artistPerformances[artist.id] !== undefined ? artistPerformances[artist.id] : (!initialVideo ? 0 : weightS);
                         const peranUtamaArtist =
                           artist.textFields?.['Peran Utama'] || 'Aktor / Seniman Film';
 
                         return (
                           <div
                             key={artist.id}
-                            className="p-3 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-2.5 shadow-sm"
+                            className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-3 shadow-sm"
                           >
                             <div className="flex items-center justify-between gap-2">
                               <div className="flex items-center gap-2.5 min-w-0">
@@ -718,52 +757,113 @@ export const VideoFormModal: React.FC<VideoFormModalProps> = ({
                               </button>
                             </div>
 
-                            {/* Status Peran input with Autocomplete / History */}
-                            <div className="space-y-1 pt-1.5 border-t border-slate-800/80">
+                            {/* Status Peran input (Poin 1A & 1B: Supports empty string / null without reverting) */}
+                            <div className="space-y-1.5 pt-2 border-t border-slate-800/80">
                               <div className="flex items-center justify-between text-[11px]">
                                 <span className="font-semibold text-slate-300">
                                   Status Peran di Video Ini:
                                 </span>
                                 <span className="text-[10px] text-slate-400">
-                                  Ketik bebas / klik riwayat
+                                  (S = {weightS}%)
                                 </span>
                               </div>
                               <input
                                 type="text"
                                 list="role-history-datalist"
                                 value={currentRole}
-                                onChange={(e) =>
+                                onChange={(e) => {
+                                  const val = e.target.value;
                                   setArtistRoles((prev) => ({
                                     ...prev,
-                                    [artist.id]: e.target.value,
-                                  }))
-                                }
-                                placeholder="Contoh: Artis Utama, Aktor, Sutradara, Cameo..."
+                                    [artist.id]: val, // Supports empty string!
+                                  }));
+                                  // Update performance slider default to new role's S weight if not customized
+                                  const newS = getRoleWeightS(val);
+                                  setArtistPerformances((prev) => ({
+                                    ...prev,
+                                    [artist.id]: newS,
+                                  }));
+                                }}
+                                placeholder="Kosongkan atau ketik status peran..."
                                 className="w-full min-h-[38px] px-3 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                               />
 
-                              {/* Quick Role Suggestion Chips */}
-                              <div className="flex flex-wrap gap-1 pt-1">
-                                {roleSuggestions.slice(0, 6).map((sug) => (
-                                  <button
-                                    key={sug}
-                                    type="button"
-                                    onClick={() =>
-                                      setArtistRoles((prev) => ({
-                                        ...prev,
-                                        [artist.id]: sug,
-                                      }))
-                                    }
-                                    className={`px-2 py-0.5 rounded-md text-[10px] font-medium transition cursor-pointer ${
-                                      currentRole.toLowerCase() === sug.toLowerCase()
-                                        ? 'bg-indigo-600 text-white font-bold'
-                                        : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800 hover:bg-slate-800'
-                                    }`}
-                                  >
-                                    {sug}
-                                  </button>
-                                ))}
+                              {/* Quick Dynamic Role Suggestions */}
+                              {roleSuggestions.length > 0 && (
+                                <div className="flex flex-wrap gap-1 pt-1">
+                                  {roleSuggestions.map((sug) => (
+                                    <button
+                                      key={sug}
+                                      type="button"
+                                      onClick={() => {
+                                        setArtistRoles((prev) => ({
+                                          ...prev,
+                                          [artist.id]: sug,
+                                        }));
+                                        const newS = getRoleWeightS(sug);
+                                        setArtistPerformances((prev) => ({
+                                          ...prev,
+                                          [artist.id]: newS,
+                                        }));
+                                      }}
+                                      className={`px-2 py-0.5 rounded-md text-[10px] font-medium transition cursor-pointer ${
+                                        currentRole.toLowerCase() === sug.toLowerCase()
+                                          ? 'bg-indigo-600 text-white font-bold'
+                                          : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800 hover:bg-slate-800'
+                                      }`}
+                                    >
+                                      {sug}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Slider Nilai Performa (P) - Rentang 0-100 (Poin 1C & 1D) */}
+                            <div className="space-y-1.5 pt-2 border-t border-slate-800/80">
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="font-bold text-slate-200">
+                                  Nilai Performa (P):
+                                </span>
+                                <span className="font-extrabold text-indigo-400 text-sm">
+                                  {currentP}%
+                                </span>
                               </div>
+
+                              <div className="flex items-center gap-3">
+                                <input
+                                  type="range"
+                                  min="0"
+                                  max="100"
+                                  value={currentP}
+                                  onChange={(e) => {
+                                    const val = Number(e.target.value);
+                                    setArtistPerformances((prev) => ({
+                                      ...prev,
+                                      [artist.id]: val,
+                                    }));
+                                  }}
+                                  className="flex-1 accent-indigo-500 h-2 bg-slate-800 rounded-lg cursor-pointer"
+                                />
+                                <input
+                                  type="number"
+                                  inputMode="numeric"
+                                  min="0"
+                                  max="100"
+                                  value={currentP}
+                                  onChange={(e) => {
+                                    const val = Math.max(0, Math.min(100, Number(e.target.value) || 0));
+                                    setArtistPerformances((prev) => ({
+                                      ...prev,
+                                      [artist.id]: val,
+                                    }));
+                                  }}
+                                  className="w-16 min-h-[36px] px-2 text-center text-xs font-bold rounded-lg bg-slate-900 border border-slate-700 text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                />
+                              </div>
+                              <p className="text-[10px] text-slate-400">
+                                Rumus Nilai Didapat: (V × (S + P)) / 200
+                              </p>
                             </div>
                           </div>
                         );

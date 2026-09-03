@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Plus, Trash2, Check, Image as ImageIcon, Link as LinkIcon, Info, Upload, AlertCircle } from 'lucide-react';
-import { Artist, ArtistLink } from '../types';
+import { Artist, ArtistLink, GalleryNote } from '../types';
+import { getStoredGalleryNotes } from '../utils/storage';
 
 interface ArtistFormModalProps {
   isOpen: boolean;
@@ -19,6 +20,8 @@ export const ArtistFormModal: React.FC<ArtistFormModalProps> = ({
   const [avatarUrl, setAvatarUrl] = useState('');
   const [coverUrl, setCoverUrl] = useState('');
   const [bio, setBio] = useState('');
+  const [birthMonthYear, setBirthMonthYear] = useState('');
+  const [selectedGalleryNoteIds, setSelectedGalleryNoteIds] = useState<string[]>([]);
   const [links, setLinks] = useState<ArtistLink[]>([]);
   const [embedImages, setEmbedImages] = useState<string[]>([]);
   const [newEmbedUrl, setNewEmbedUrl] = useState('');
@@ -26,12 +29,17 @@ export const ArtistFormModal: React.FC<ArtistFormModalProps> = ({
   const [formError, setFormError] = useState('');
   const [roleText, setRoleText] = useState('');
 
+  const [availableGalleryNotes, setAvailableGalleryNotes] = useState<GalleryNote[]>([]);
+
   useEffect(() => {
+    setAvailableGalleryNotes(getStoredGalleryNotes());
     if (initialArtist) {
       setName(initialArtist.name || '');
       setAvatarUrl(initialArtist.avatarUrl || '');
       setCoverUrl(initialArtist.coverUrl || '');
       setBio(initialArtist.bio || '');
+      setBirthMonthYear(initialArtist.birthMonthYear || '');
+      setSelectedGalleryNoteIds(initialArtist.galleryNoteIds || []);
       setLinks(initialArtist.links || []);
       setEmbedImages(initialArtist.embedImages || []);
       setRoleText(initialArtist.textFields?.['Peran Utama'] || '');
@@ -40,6 +48,8 @@ export const ArtistFormModal: React.FC<ArtistFormModalProps> = ({
       setAvatarUrl('https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80');
       setCoverUrl('https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c?w=1000&auto=format&fit=crop&q=80');
       setBio('');
+      setBirthMonthYear('');
+      setSelectedGalleryNoteIds([]);
       setLinks([]);
       setEmbedImages([]);
       setRoleText('');
@@ -161,6 +171,8 @@ export const ArtistFormModal: React.FC<ArtistFormModalProps> = ({
         'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&auto=format&fit=crop&q=80',
       coverUrl: coverUrl.trim(),
       bio: bio.trim(),
+      birthMonthYear,
+      galleryNoteIds: selectedGalleryNoteIds,
       links,
       embedImages: finalEmbedImages,
       textFields: {
@@ -230,6 +242,63 @@ export const ArtistFormModal: React.FC<ArtistFormModalProps> = ({
               placeholder="Contoh: Reza Rahadian / Christopher Nolan"
               className="w-full min-h-[48px] px-3.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
+          </div>
+
+          {/* Field Bulan-Tahun Lahir (Month/Year) - WAJIB ADA (Poin 5A.3) */}
+          <div className="space-y-1.5">
+            <label className="text-sm font-bold text-slate-200 flex items-center justify-between">
+              <span>Bulan &amp; Tahun Lahir (Perhitungan Umur Otomatis)</span>
+              <span className="text-amber-400 text-xs font-bold">Field Wajib</span>
+            </label>
+            <input
+              type="month"
+              value={birthMonthYear}
+              onChange={(e) => setBirthMonthYear(e.target.value)}
+              className="w-full min-h-[48px] px-3.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+            <p className="text-[11px] text-slate-400">
+              Sistem akan menghitung umur artis secara otomatis berdasarkan entri ini.
+            </p>
+          </div>
+
+          {/* Field Galeri Catatan (Gallery Notes) - WAJIB ADA (Poin 5A.2) */}
+          <div className="space-y-2 p-3.5 rounded-2xl bg-slate-950 border border-slate-800">
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-bold text-slate-200">Field Galeri Catatan</label>
+              <span className="text-amber-400 text-xs font-bold">Field Wajib</span>
+            </div>
+            <p className="text-xs text-slate-400">Hubungkan profil artis ini ke Catatan Gallery yang relevan.</p>
+
+            {availableGalleryNotes.length === 0 ? (
+              <p className="text-xs text-slate-500 italic">Belum ada Catatan Gallery yang dibuat.</p>
+            ) : (
+              <div className="space-y-1.5 pt-1">
+                {availableGalleryNotes.map((note) => {
+                  const isChecked = selectedGalleryNoteIds.includes(note.id);
+                  return (
+                    <button
+                      key={note.id}
+                      type="button"
+                      onClick={() => {
+                        if (isChecked) {
+                          setSelectedGalleryNoteIds(selectedGalleryNoteIds.filter((id) => id !== note.id));
+                        } else {
+                          setSelectedGalleryNoteIds([...selectedGalleryNoteIds, note.id]);
+                        }
+                      }}
+                      className={`w-full flex items-center justify-between p-2.5 rounded-xl text-xs font-semibold transition border cursor-pointer ${
+                        isChecked
+                          ? 'bg-indigo-950/80 border-indigo-500 text-white'
+                          : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      <span className="truncate">{note.title}</span>
+                      {isChecked && <Check className="w-4 h-4 text-indigo-400 shrink-0" />}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Role / Text field */}

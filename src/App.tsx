@@ -24,6 +24,7 @@ import { ArtistRankView } from './components/ArtistRankView';
 import { ArtistDetailView } from './components/ArtistDetailView';
 import { VideoDetailView } from './components/VideoDetailView';
 import { SettingsView } from './components/SettingsView';
+import { GalleryNotesView } from './components/GalleryNotesView';
 import { VideoFormModal } from './components/VideoFormModal';
 import { ArtistFormModal } from './components/ArtistFormModal';
 import { ConfirmModal } from './components/ConfirmModal';
@@ -39,6 +40,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<TabType>('home');
   const [selectedArtistId, setSelectedArtistId] = useState<string | null>(null);
   const [selectedVideoId, setSelectedVideoId] = useState<string | null>(null);
+  const [artistRoleFilter, setArtistRoleFilter] = useState<string | null>(null);
 
   // Initial filter navigation state for rankings (Requirement 8)
   const [videoRankInitialFilter, setVideoRankInitialFilter] = useState<{
@@ -379,6 +381,10 @@ export default function App() {
                       setArtistRankInitialFilter({ fieldId, option });
                       setActiveTab('rank_artists');
                     }}
+                    onFilterByRole={(role) => {
+                      setSelectedArtistId(null);
+                      setArtistRoleFilter(role);
+                    }}
                   />
                 ) : (
                   <ArtistListView
@@ -387,8 +393,18 @@ export default function App() {
                     onSelectArtist={handleSelectArtist}
                     onOpenCreateArtist={handleOpenCreateArtist}
                     onDeleteArtist={handleDeleteArtist}
+                    filterRole={artistRoleFilter}
+                    onClearRoleFilter={() => setArtistRoleFilter(null)}
                   />
                 )
+              )}
+
+              {/* TAB BARU: Catatan Gallery */}
+              {activeTab === 'gallery_notes' && (
+                <GalleryNotesView
+                  artists={artists}
+                  onSelectArtist={handleSelectArtist}
+                />
               )}
 
               {/* TAB 3: Rank Video */}
