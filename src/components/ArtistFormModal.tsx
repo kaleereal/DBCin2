@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Plus, Trash2, Check, Image as ImageIcon, Link as LinkIcon, Info, Upload, AlertCircle } from 'lucide-react';
-import { Artist, ArtistLink, GalleryNote } from '../types';
-import { getStoredGalleryNotes, saveGalleryNotes } from '../utils/storage';
+import { Artist, ArtistLink, GalleryNote, CustomFieldDefinition } from '../types';
+import { getStoredGalleryNotes, saveGalleryNotes, getStoredArtistFields } from '../utils/storage';
 import { GalleryNoteModal } from './GalleryNoteModal';
 
 interface ArtistFormModalProps {
@@ -29,12 +29,18 @@ export const ArtistFormModal: React.FC<ArtistFormModalProps> = ({
   const [embedUrlError, setEmbedUrlError] = useState('');
   const [formError, setFormError] = useState('');
   const [roleText, setRoleText] = useState('');
+  const [artistFields, setArtistFields] = useState<CustomFieldDefinition[]>([]);
+  const [customTextFields, setCustomTextFields] = useState<Record<string, string>>({});
+  const [customNumberFields, setCustomNumberFields] = useState<Record<string, number>>({});
 
   const [availableGalleryNotes, setAvailableGalleryNotes] = useState<GalleryNote[]>([]);
   const [isCreatingDirectNote, setIsCreatingDirectNote] = useState(false);
 
   useEffect(() => {
     setAvailableGalleryNotes(getStoredGalleryNotes());
+    const fields = getStoredArtistFields();
+    setArtistFields(fields);
+
     if (initialArtist) {
       setName(initialArtist.name || '');
       setAvatarUrl(initialArtist.avatarUrl || '');
@@ -45,6 +51,8 @@ export const ArtistFormModal: React.FC<ArtistFormModalProps> = ({
       setLinks(initialArtist.links || []);
       setEmbedImages(initialArtist.embedImages || []);
       setRoleText(initialArtist.textFields?.['Peran Utama'] || '');
+      setCustomTextFields(initialArtist.textFields || {});
+      setCustomNumberFields(initialArtist.numberFields || {});
     } else {
       setName('');
       setAvatarUrl('https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80');
@@ -55,6 +63,8 @@ export const ArtistFormModal: React.FC<ArtistFormModalProps> = ({
       setLinks([]);
       setEmbedImages([]);
       setRoleText('');
+      setCustomTextFields({});
+      setCustomNumberFields({});
     }
     setNewEmbedUrl('');
     setEmbedUrlError('');
@@ -178,8 +188,10 @@ export const ArtistFormModal: React.FC<ArtistFormModalProps> = ({
       links,
       embedImages: finalEmbedImages,
       textFields: {
-        'Peran Utama': roleText.trim() || 'Aktor / Seniman Film',
+        ...customTextFields,
+        'Peran Utama': roleText.trim() || customTextFields['Peran Utama'] || 'Aktor / Seniman Film',
       },
+      numberFields: customNumberFields,
       updatedAt: new Date().toISOString(),
     };
 
@@ -310,17 +322,65 @@ export const ArtistFormModal: React.FC<ArtistFormModalProps> = ({
             )}
           </div>
 
-          {/* Role / Text field */}
-          <div className="space-y-1.5">
-            <label className="text-sm font-bold text-slate-200">Peran / Profesi Utama</label>
-            <input
-              type="text"
-              value={roleText}
-              onChange={(e) => setRoleText(e.target.value)}
-              placeholder="Contoh: Aktor Utama / Sutradara & Produser"
-              className="w-full min-h-[48px] px-3.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-          </div>
+          {/* Custom Fields configured via Settings (Struktur & Urutan Field Artis) */}
+          {artistFields
+            .filter((f) => !['galleryNoteIds', 'birthMonthYear', 'links'].includes(f.key))
+            .map((field) => {
+              if (field.key === 'Peran Utama') {
+                return (
+                  <div key={field.id} className="space-y-1.5">
+                    <label className="text-sm font-bold text-slate-200">{field.label}</label>
+                    <input
+                      type="text"
+                      value={roleText}
+                      onChange={(e) => setRoleText(e.target.value)}
+                      placeholder="Contoh: Aktor Utama / Sutradara & Produser"
+                      className="w-full min-h-[48px] px-3.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+                );
+              }
+
+              if (field.type === 'number') {
+                return (
+                  <div key={field.id} className="space-y-1.5">
+                    <label className="text-sm font-bold text-slate-200">{field.label}</label>
+                    <p className="text-xs text-slate-400">{field.description}</p>
+                    <input
+                      type="number"
+                      value={customNumberFields[field.label] ?? ''}
+                      onChange={(e) =>
+                        setCustomNumberFields({
+                          ...customNumberFields,
+                          [field.label]: e.target.value !== '' ? Number(e.target.value) : 0,
+                        })
+                      }
+                      placeholder={`Masukkan ${field.label}...`}
+                      className="w-full min-h-[48px] px-3.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+                );
+              }
+
+              return (
+                <div key={field.id} className="space-y-1.5">
+                  <label className="text-sm font-bold text-slate-200">{field.label}</label>
+                  <p className="text-xs text-slate-400">{field.description}</p>
+                  <input
+                    type="text"
+                    value={customTextFields[field.label] || ''}
+                    onChange={(e) =>
+                      setCustomTextFields({
+                        ...customTextFields,
+                        [field.label]: e.target.value,
+                      })
+                    }
+                    placeholder={`Masukkan ${field.label}...`}
+                    className="w-full min-h-[48px] px-3.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+              );
+            })}
 
           {/* Avatar URL & Upload */}
           <div className="space-y-2">
