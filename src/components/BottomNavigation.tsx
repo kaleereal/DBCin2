@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, Users, BarChart3, Trophy, Settings, FileText } from 'lucide-react';
+import { Home, Users, BarChart3, Trophy, Settings } from 'lucide-react';
 import { TabType } from '../types';
 
 interface BottomNavigationProps {
@@ -27,11 +27,6 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
       label: 'Artis',
       icon: Users,
       badge: artistCount > 0 ? artistCount : undefined,
-    },
-    {
-      id: 'gallery_notes' as TabType,
-      label: 'Catatan',
-      icon: FileText,
     },
     {
       id: 'rank_videos' as TabType,

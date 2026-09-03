@@ -29,7 +29,11 @@ import {
   getStoredPivots,
   getStoredRoleWeights,
   recalculateAllVideoPivots,
+  getStoredGalleryNotes,
+  saveGalleryNotes,
 } from '../utils/storage';
+import { GalleryNoteModal } from './GalleryNoteModal';
+import { GalleryNote } from '../types';
 import { RatingBadge } from './RatingBadge';
 
 interface ArtistDetailViewProps {
@@ -63,6 +67,7 @@ export const ArtistDetailView: React.FC<ArtistDetailViewProps> = ({
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
   const [isFootnoteOpen, setIsFootnoteOpen] = useState(false);
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
+  const [readingNote, setReadingNote] = useState<GalleryNote | null>(null);
 
   // Sorting state for Performance Table
   const [perfSortKey, setPerfSortKey] = useState<'performance' | 'score' | 'release' | 'title'>('performance');
@@ -244,6 +249,16 @@ export const ArtistDetailView: React.FC<ArtistDetailViewProps> = ({
 
     return list;
   }, [linkedVideos, videoScores, artist.id, effectiveArtists, perfSortKey, perfSortOrder]);
+
+  // Linked Gallery Notes for this Artist (Poin 2)
+  const linkedGalleryNotes = useMemo(() => {
+    const allNotes = getStoredGalleryNotes();
+    return allNotes.filter((note) => {
+      if (note.linkedArtistIds?.includes(artist.id)) return true;
+      if (artist.galleryNoteIds?.includes(note.id)) return true;
+      return false;
+    });
+  }, [artist.id, artist.galleryNoteIds]);
 
   const coverUrl =
     artist.coverUrl ||
@@ -714,6 +729,45 @@ export const ArtistDetailView: React.FC<ArtistDetailViewProps> = ({
             </p>
           </div>
 
+          {/* Akses Catatan Galeri Tertaut (Poin 2) */}
+          <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3 shadow-md">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-indigo-400 flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Catatan Galeri Tertaut ({linkedGalleryNotes.length})</span>
+              </h3>
+            </div>
+
+            {linkedGalleryNotes.length === 0 ? (
+              <p className="text-xs text-slate-500 italic">
+                Belum ada Catatan Galeri yang ditautkan ke artis ini.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {linkedGalleryNotes.map((note) => (
+                  <button
+                    key={note.id}
+                    type="button"
+                    onClick={() => setReadingNote(note)}
+                    className="w-full flex items-center justify-between p-3 rounded-xl bg-slate-950 hover:bg-slate-850 border border-slate-800 hover:border-indigo-500/60 transition text-left cursor-pointer group"
+                  >
+                    <div>
+                      <div className="text-xs font-bold text-white group-hover:text-indigo-300 transition">
+                        {note.title}
+                      </div>
+                      <div className="text-[10px] text-slate-500 mt-0.5">
+                        {note.blocks?.length || 0} Blok Komponen • Klik untuk membaca
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-bold text-indigo-400 bg-indigo-950 px-2 py-1 rounded-lg border border-indigo-800/60 shrink-0">
+                      Buka ➔
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* Catatan Kaki: Deskripsi Item Pilihan (Collapsible) - Requirement 7 */}
           {footnoteItems.length > 0 && (
             <div className="rounded-2xl bg-slate-900 border border-slate-800 overflow-hidden shadow-sm">
@@ -867,6 +921,22 @@ export const ArtistDetailView: React.FC<ArtistDetailViewProps> = ({
             </div>
           )}
         </div>
+      )}
+
+      {/* Modal Detail / Reader Catatan Galeri (Poin 2) */}
+      {readingNote && (
+        <GalleryNoteModal
+          isOpen={!!readingNote}
+          onClose={() => setReadingNote(null)}
+          onSave={(updatedNote) => {
+            const allNotes = getStoredGalleryNotes();
+            const updatedList = allNotes.map((n) => (n.id === updatedNote.id ? updatedNote : n));
+            saveGalleryNotes(updatedList);
+            setReadingNote(null);
+          }}
+          initialNote={readingNote}
+          artists={effectiveArtists}
+        />
       )}
 
       {/* Lightbox Image Preview Modal */}

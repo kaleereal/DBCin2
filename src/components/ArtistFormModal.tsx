@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { X, Plus, Trash2, Check, Image as ImageIcon, Link as LinkIcon, Info, Upload, AlertCircle } from 'lucide-react';
 import { Artist, ArtistLink, GalleryNote } from '../types';
-import { getStoredGalleryNotes } from '../utils/storage';
+import { getStoredGalleryNotes, saveGalleryNotes } from '../utils/storage';
+import { GalleryNoteModal } from './GalleryNoteModal';
 
 interface ArtistFormModalProps {
   isOpen: boolean;
@@ -30,6 +31,7 @@ export const ArtistFormModal: React.FC<ArtistFormModalProps> = ({
   const [roleText, setRoleText] = useState('');
 
   const [availableGalleryNotes, setAvailableGalleryNotes] = useState<GalleryNote[]>([]);
+  const [isCreatingDirectNote, setIsCreatingDirectNote] = useState(false);
 
   useEffect(() => {
     setAvailableGalleryNotes(getStoredGalleryNotes());
@@ -261,18 +263,25 @@ export const ArtistFormModal: React.FC<ArtistFormModalProps> = ({
             </p>
           </div>
 
-          {/* Field Galeri Catatan (Gallery Notes) - WAJIB ADA (Poin 5A.2) */}
-          <div className="space-y-2 p-3.5 rounded-2xl bg-slate-950 border border-slate-800">
+          {/* Field Galeri Catatan (Gallery Notes) - Direct Create & Auto-link (Poin 3) */}
+          <div className="space-y-2.5 p-3.5 rounded-2xl bg-slate-950 border border-slate-800">
             <div className="flex items-center justify-between">
               <label className="text-sm font-bold text-slate-200">Field Galeri Catatan</label>
-              <span className="text-amber-400 text-xs font-bold">Field Wajib</span>
+              <button
+                type="button"
+                onClick={() => setIsCreatingDirectNote(true)}
+                className="text-xs font-bold text-indigo-400 hover:text-indigo-300 flex items-center gap-1 cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>+ Buat Catatan Baru di Sini</span>
+              </button>
             </div>
-            <p className="text-xs text-slate-400">Hubungkan profil artis ini ke Catatan Gallery yang relevan.</p>
+            <p className="text-xs text-slate-400">Hubungkan profil artis ini ke Catatan Gallery atau buat baru secara langsung.</p>
 
             {availableGalleryNotes.length === 0 ? (
-              <p className="text-xs text-slate-500 italic">Belum ada Catatan Gallery yang dibuat.</p>
+              <p className="text-xs text-slate-500 italic">Belum ada Catatan Gallery yang dibuat. Klik tombol di atas untuk membuat!</p>
             ) : (
-              <div className="space-y-1.5 pt-1">
+              <div className="space-y-1.5 pt-1 max-h-40 overflow-y-auto">
                 {availableGalleryNotes.map((note) => {
                   const isChecked = selectedGalleryNoteIds.includes(note.id);
                   return (
@@ -558,6 +567,25 @@ export const ArtistFormModal: React.FC<ArtistFormModalProps> = ({
               </div>
             )}
           </div>
+
+          {/* Direct Note Creation Modal inside Artist Form (Poin 3) */}
+          {isCreatingDirectNote && (
+            <GalleryNoteModal
+              isOpen={isCreatingDirectNote}
+              onClose={() => setIsCreatingDirectNote(false)}
+              onSave={(newNote) => {
+                const currentNotes = getStoredGalleryNotes();
+                const updatedList = [newNote, ...currentNotes];
+                saveGalleryNotes(updatedList);
+                setAvailableGalleryNotes(updatedList);
+                // Auto-link newly created note to this artist!
+                setSelectedGalleryNoteIds((prev) => [...prev, newNote.id]);
+                setIsCreatingDirectNote(false);
+              }}
+              initialNote={null}
+              artists={[]}
+            />
+          )}
 
           {/* Sticky Save Button */}
           <div className="fixed bottom-0 left-0 right-0 max-w-lg mx-auto p-4 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 z-30">
