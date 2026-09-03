@@ -450,18 +450,20 @@ export default function App() {
           )}
         </main>
 
-        {/* Floating Action Button (FAB) */}
+        {/* Floating Action Button (FAB) - Tampil HANYA di Beranda & Daftar Artis (Poin 4) */}
         {!isVideoModalOpen && !isArtistModalOpen && !selectedVideoId && (
-          <FAB
-            onClick={() => {
-              if (activeTab === 'artists' && !selectedArtistId) {
-                handleOpenCreateArtist();
-              } else {
-                handleOpenCreateVideo();
-              }
-            }}
-            label={activeTab === 'artists' && !selectedArtistId ? 'Tambah Artis' : 'Tambah Video'}
-          />
+          (activeTab === 'home' || (activeTab === 'artists' && !selectedArtistId)) && (
+            <FAB
+              onClick={() => {
+                if (activeTab === 'artists' && !selectedArtistId) {
+                  handleOpenCreateArtist();
+                } else {
+                  handleOpenCreateVideo();
+                }
+              }}
+              label={activeTab === 'artists' ? 'Tambah Artis' : 'Tambah Video'}
+            />
+          )
         )}
 
         {/* Bottom Navigation Bar (5 tabs) */}

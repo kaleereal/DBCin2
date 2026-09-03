@@ -141,7 +141,8 @@ export const GalleryNotesView: React.FC<GalleryNotesViewProps> = ({
             return (
               <div
                 key={note.id}
-                className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3 shadow-md hover:border-slate-700 transition"
+                onClick={() => handleOpenEdit(note)}
+                className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3 shadow-md hover:border-indigo-500/60 transition cursor-pointer group"
               >
                 {/* Note Title & Quick Actions Toolbar (Poin 4.4) */}
                 <div className="flex items-start justify-between gap-2">
@@ -154,7 +155,7 @@ export const GalleryNotesView: React.FC<GalleryNotesViewProps> = ({
                   </div>
 
                   {/* Quick Actions (Simpan, Hapus, Duplikat, Tautkan) */}
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                     <button
                       type="button"
                       onClick={() => handleDuplicateNote(note)}
@@ -167,7 +168,7 @@ export const GalleryNotesView: React.FC<GalleryNotesViewProps> = ({
                       type="button"
                       onClick={() => handleOpenEdit(note)}
                       className="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-amber-300 transition"
-                      title="Edit Catatan"
+                      title="Edit / Baca Catatan"
                     >
                       <Edit2 className="w-3.5 h-3.5" />
                     </button>

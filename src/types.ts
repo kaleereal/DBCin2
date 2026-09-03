@@ -189,23 +189,6 @@ export interface GalleryNote {
   updatedAt: string;
 }
 
-export interface NoteBlock {
-  id: string;
-  type: 'text' | 'heading' | 'bullet_list' | 'image' | 'quote';
-  content: string;
-  bold?: boolean;
-  italic?: boolean;
-}
-
-export interface GalleryNote {
-  id: string;
-  title: string;
-  blocks: NoteBlock[];
-  linkedArtistIds: string[];
-  createdAt: string;
-  updatedAt: string;
-}
-
 export interface FilterCriteria {
   searchQuery: string;
   sortOrder: 'desc' | 'asc'; // highest rating first or lowest rating first
