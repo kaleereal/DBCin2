@@ -31,7 +31,9 @@ import {
   AlertCircle,
   CheckCircle2,
   Copy,
+  Palette,
 } from 'lucide-react';
+import { useTheme } from '../context/ThemeContext';
 import {
   CustomFieldDefinition,
   FieldType,
@@ -58,6 +60,8 @@ import {
   getStoredArtists,
   getStoredPivots,
   savePivots,
+  getStoredArtistFields,
+  saveArtistFields,
 } from '../utils/storage';
 import { PWAInstallButton } from './PWAInstallButton';
 import { ConfirmModal } from './ConfirmModal';
@@ -73,6 +77,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   onUpdateFields,
   onRefreshData,
 }) => {
+  const { startThemeEditMode } = useTheme();
+
   // Modal for add/edit field
   const [editingField, setEditingField] = useState<CustomFieldDefinition | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -97,15 +103,22 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [isPwaOpen, setIsPwaOpen] = useState(false);
   const [isRatingTemplatesOpen, setIsRatingTemplatesOpen] = useState(false);
   const [isFieldsOpen, setIsFieldsOpen] = useState(false);
+  const [isArtistFieldsOpen, setIsArtistFieldsOpen] = useState(false);
   const [isRoleWeightsOpen, setIsRoleWeightsOpen] = useState(false);
   const [isBackupOpen, setIsBackupOpen] = useState(false);
+
+  // Artist Fields State
+  const [artistFields, setArtistFields] = useState<CustomFieldDefinition[]>([]);
+  const [editingArtistField, setEditingArtistField] = useState<CustomFieldDefinition | null>(null);
+  const [isArtistFieldModalOpen, setIsArtistFieldModalOpen] = useState(false);
+  const [artistFieldLabel, setArtistFieldLabel] = useState('');
+  const [artistFieldDesc, setArtistFieldDesc] = useState('');
+  const [artistFieldType, setArtistFieldType] = useState<FieldType>('custom_text');
 
   // Role Weights State
   const [roleWeights, setRoleWeights] = useState<RoleWeight[]>([]);
   const [isRecalculating, setIsRecalculating] = useState(false);
   const [recalcStatus, setRecalcStatus] = useState<string | null>(null);
-  const [newRoleName, setNewRoleName] = useState('');
-  const [newRoleWeight, setNewRoleWeight] = useState(100);
 
   // Folder modal state (Add / Edit Folder)
   const [isFolderModalOpen, setIsFolderModalOpen] = useState(false);
@@ -152,18 +165,27 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     const storedVideos = getStoredVideos();
     const synced = syncRoleWeightsWithVideos(storedVideos);
     setRoleWeights(synced);
+
+    // Load artist custom field definitions
+    setArtistFields(getStoredArtistFields());
   }, []);
 
   const handleWeightChange = (roleName: string, weight: number) => {
     const clamped = Math.max(0, Math.min(100, weight));
     const updated = roleWeights.map((rw) =>
-      rw.roleName.toLowerCase() === roleName.toLowerCase()
+      rw.roleName.toLowerCase() === roleName.toLowerCase() && !rw.isLocked
         ? { ...rw, weight: clamped }
         : rw
     );
     setRoleWeights(updated);
     saveRoleWeights(updated);
     onRefreshData();
+  };
+
+  const handleStepRoleWeight = (roleName: string, delta: number) => {
+    const targetRole = roleWeights.find((r) => r.roleName.toLowerCase() === roleName.toLowerCase());
+    if (!targetRole || targetRole.isLocked) return;
+    handleWeightChange(roleName, targetRole.weight + delta);
   };
 
   const handleToggleLockRole = (roleName: string) => {
@@ -700,6 +722,27 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </p>
       </div>
 
+      {/* Section Pengaturan Tema & Tipografi (Poin 7 & 8) */}
+      <div className="rounded-3xl bg-slate-900 border border-slate-800 p-4 shadow-lg flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-indigo-600/20 text-indigo-400 flex items-center justify-center shrink-0">
+            <Palette className="w-5 h-5" />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold text-white">Sistem Tema &amp; Tipografi Dinamis</h3>
+            <p className="text-xs text-slate-400">Ubah warna dan ukuran font live dengan floating editor</p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={startThemeEditMode}
+          className="min-h-[42px] px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center gap-1.5 transition active:scale-95 cursor-pointer shrink-0 shadow-md shadow-indigo-600/30"
+        >
+          <Palette className="w-4 h-4" />
+          <span>Edit Tema</span>
+        </button>
+      </div>
+
       {/* PWA Section (Collapsible, default: collapsed) */}
       <div className="rounded-3xl bg-slate-900 border border-slate-800 overflow-hidden shadow-lg">
         <button
@@ -1059,6 +1102,143 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         )}
       </div>
 
+      {/* Section Pengaturan Baru: "Struktur & Urutan Field Artis" (Poin 3B) */}
+      <div className="rounded-3xl bg-slate-900 border border-slate-800 overflow-hidden shadow-lg">
+        <button
+          type="button"
+          onClick={() => setIsArtistFieldsOpen(!isArtistFieldsOpen)}
+          className="w-full flex items-center justify-between p-4 hover:bg-slate-850 transition cursor-pointer text-left"
+        >
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-violet-600/20 text-violet-400 flex items-center justify-center shrink-0">
+              <ListPlus className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-white">Struktur &amp; Urutan Field Artis</h3>
+              <p className="text-xs text-slate-400">
+                {artistFields.length} Field kustomisasi form Buat/Edit Entri Artis
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5 text-slate-400 text-xs font-semibold shrink-0 ml-2">
+            <span>{isArtistFieldsOpen ? 'Tutup' : 'Buka'}</span>
+            {isArtistFieldsOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </div>
+        </button>
+
+        {isArtistFieldsOpen && (
+          <div className="p-4 pt-2 border-t border-slate-800/80 space-y-3 animate-in fade-in">
+            <p className="text-xs text-slate-400">
+              Kustomisasi struktur form entri artis. Data field tambahan yang dihapus tidak hilang permanen di database.
+            </p>
+
+            {/* List View Field Artis */}
+            <div className="space-y-2">
+              {artistFields.map((field, idx) => (
+                <div
+                  key={field.id}
+                  className="flex items-center gap-3 p-3.5 rounded-2xl bg-slate-950/90 border border-slate-800 hover:border-slate-700 transition shadow-sm"
+                >
+                  {/* Drag/Reorder buttons */}
+                  <div className="flex flex-col items-center gap-1 shrink-0 text-slate-400">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (idx === 0) return;
+                        const copy = [...artistFields];
+                        const temp = copy[idx];
+                        copy[idx] = copy[idx - 1];
+                        copy[idx - 1] = temp;
+                        const reordered = copy.map((it, i) => ({ ...it, order: i + 1 }));
+                        setArtistFields(reordered);
+                        saveArtistFields(reordered);
+                      }}
+                      disabled={idx === 0}
+                      className="p-1 rounded hover:bg-slate-800 disabled:opacity-20 transition"
+                      title="Pindah ke Atas"
+                    >
+                      <ArrowUp className="w-3.5 h-3.5" />
+                    </button>
+                    <GripVertical className="w-4 h-4 text-slate-600" />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (idx === artistFields.length - 1) return;
+                        const copy = [...artistFields];
+                        const temp = copy[idx];
+                        copy[idx] = copy[idx + 1];
+                        copy[idx + 1] = temp;
+                        const reordered = copy.map((it, i) => ({ ...it, order: i + 1 }));
+                        setArtistFields(reordered);
+                        saveArtistFields(reordered);
+                      }}
+                      disabled={idx === artistFields.length - 1}
+                      className="p-1 rounded hover:bg-slate-800 disabled:opacity-20 transition"
+                      title="Pindah ke Bawah"
+                    >
+                      <ArrowDown className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  {/* Field Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-sm font-bold text-white truncate">{field.label}</h4>
+                      {field.isSystem && (
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-950/80 text-amber-300 border border-amber-800/60">
+                          WAJIB / SISTEM
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">{field.description}</p>
+                  </div>
+
+                  {/* Delete button (Non-system fields only) */}
+                  {!field.isSystem && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setConfirmModalData({
+                          title: 'Sembunyikan / Hapus Field Artis',
+                          message: `Sembunyikan field "${field.label}" dari form artis? Data historis yang tersimpan tidak akan hilang secara permanen.`,
+                          confirmText: 'Sembunyikan',
+                          isDanger: true,
+                          onConfirm: () => {
+                            const updated = artistFields.filter((f) => f.id !== field.id);
+                            setArtistFields(updated);
+                            saveArtistFields(updated);
+                          },
+                        });
+                      }}
+                      className="p-2 rounded-xl bg-slate-800/60 hover:bg-rose-950/80 text-rose-400 transition"
+                      title="Hapus / Sembunyikan Field"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Button Tambah Field Artis Baru */}
+            <button
+              type="button"
+              onClick={() => {
+                setEditingArtistField(null);
+                setArtistFieldLabel('');
+                setArtistFieldDesc('');
+                setArtistFieldType('custom_text');
+                setIsArtistFieldModalOpen(true);
+              }}
+              className="w-full min-h-[48px] rounded-2xl bg-violet-600/20 hover:bg-violet-600/30 text-violet-300 border border-violet-500/30 font-bold text-xs flex items-center justify-center gap-2 transition active:scale-98 cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>+ Tambah Field Form Artis Baru</span>
+            </button>
+          </div>
+        )}
+      </div>
+
       {/* Role Weights Configuration (Collapsible, default: collapsed) */}
       <div className="rounded-3xl bg-slate-900 border border-slate-800 overflow-hidden shadow-lg">
         <button
@@ -1127,10 +1307,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               )}
             </div>
 
-            {/* Role Weights List */}
+            {/* Role Weights List with Lock & Step Navigation */}
             <div className="space-y-2.5">
               <div className="flex items-center justify-between text-xs font-bold text-slate-400 px-1">
-                <span>Daftar Status Peran &amp; Bobot</span>
+                <span>Daftar Status Peran &amp; Bobot (S)</span>
                 <span>Bobot (%)</span>
               </div>
 
@@ -1147,7 +1327,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                       {rw.isLocked && (
                         <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-950/80 text-amber-300 border border-amber-800/60 flex items-center gap-1">
                           <Lock className="w-2.5 h-2.5" />
-                          Terkunci
+                          Lock Edit
                         </span>
                       )}
                     </div>
@@ -1161,7 +1341,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                             ? 'bg-amber-950/60 border-amber-800 text-amber-300'
                             : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
                         }`}
-                        title={rw.isLocked ? 'Buka kunci status ini' : 'Kunci status ini dari hitung ulang massal'}
+                        title={rw.isLocked ? 'Buka kunci slider edit' : 'Kunci slider agar tidak dapat diubah manual'}
                       >
                         {rw.isLocked ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
                       </button>
@@ -1177,69 +1357,55 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     </div>
                   </div>
 
-                  {/* Weight Slider & Input (0 - 100%) */}
-                  <div className="flex items-center gap-3">
+                  {/* Weight Slider with Step +5 / -5 buttons */}
+                  <div className="flex items-center gap-2">
+                    {/* -5 Step Button */}
+                    <button
+                      type="button"
+                      disabled={rw.isLocked || rw.weight <= 0}
+                      onClick={() => handleStepRoleWeight(rw.roleName, -5)}
+                      className="px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 disabled:opacity-30 text-white text-xs font-black cursor-pointer transition shrink-0"
+                      title="Turunkan 5%"
+                    >
+                      -5
+                    </button>
+
                     <input
                       type="range"
                       min="0"
                       max="100"
+                      disabled={rw.isLocked}
                       value={rw.weight}
                       onChange={(e) => handleWeightChange(rw.roleName, Number(e.target.value))}
-                      className="flex-1 accent-amber-500 h-2 bg-slate-800 rounded-lg cursor-pointer"
+                      className="flex-1 accent-amber-500 h-2 bg-slate-800 rounded-lg cursor-pointer disabled:opacity-40"
                     />
-                    <div className="flex items-center gap-1 shrink-0">
+
+                    {/* +5 Step Button */}
+                    <button
+                      type="button"
+                      disabled={rw.isLocked || rw.weight >= 100}
+                      onClick={() => handleStepRoleWeight(rw.roleName, 5)}
+                      className="px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 disabled:opacity-30 text-white text-xs font-black cursor-pointer transition shrink-0"
+                      title="Naikkan 5%"
+                    >
+                      +5
+                    </button>
+
+                    <div className="flex items-center gap-1 shrink-0 ml-1">
                       <input
                         type="number"
                         min="0"
                         max="100"
+                        disabled={rw.isLocked}
                         value={rw.weight}
                         onChange={(e) => handleWeightChange(rw.roleName, Number(e.target.value))}
-                        className="w-16 min-h-[36px] px-2 text-center text-xs font-bold rounded-lg bg-slate-900 border border-slate-700 text-white focus:outline-none focus:ring-1 focus:ring-amber-500"
+                        className="w-14 min-h-[36px] px-1.5 text-center text-xs font-bold rounded-lg bg-slate-900 border border-slate-700 text-white focus:outline-none focus:ring-1 focus:ring-amber-500 disabled:opacity-40"
                       />
                       <span className="text-xs font-bold text-slate-400">%</span>
                     </div>
                   </div>
                 </div>
               ))}
-            </div>
-
-            {/* Add New Custom Role Weight */}
-            <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800/80 space-y-2.5">
-              <h4 className="text-xs font-bold text-slate-300">
-                + Tambah Status Peran Baru
-              </h4>
-              <div className="flex flex-col sm:flex-row gap-2">
-                <input
-                  type="text"
-                  value={newRoleName}
-                  onChange={(e) => setNewRoleName(e.target.value)}
-                  placeholder="Nama status peran (misal: Co-Star, Eksekutif...)"
-                  className="flex-1 min-h-[40px] px-3.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                />
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-1">
-                    <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      value={newRoleWeight}
-                      onChange={(e) => setNewRoleWeight(Number(e.target.value))}
-                      placeholder="100"
-                      className="w-20 min-h-[40px] px-2 text-center text-xs font-bold rounded-xl bg-slate-900 border border-slate-700 text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                    />
-                    <span className="text-xs font-bold text-slate-400">%</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleAddRoleWeight}
-                    disabled={!newRoleName.trim()}
-                    className="min-h-[40px] px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white text-xs font-bold transition flex items-center gap-1 shrink-0 cursor-pointer"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Tambah</span>
-                  </button>
-                </div>
-              </div>
             </div>
           </div>
         )}
@@ -1701,6 +1867,91 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               >
                 <Check className="w-4 h-4" />
                 <span>{editingFolder ? 'Simpan Perubahan' : 'Buat Kategori'}</span>
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Tambah Field Artis Baru */}
+      {isArtistFieldModalOpen && (
+        <div className="fixed inset-0 z-60 flex flex-col justify-end sm:justify-center bg-black/80 backdrop-blur-xs p-0 sm:p-4 animate-in fade-in">
+          <div className="w-full max-w-md mx-auto bg-slate-900 border border-slate-700 rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom">
+            <div className="flex items-center justify-between p-4 border-b border-slate-800 bg-slate-900/90">
+              <h3 className="text-base font-bold text-white">Tambah Field Form Artis Baru</h3>
+              <button
+                type="button"
+                onClick={() => setIsArtistFieldModalOpen(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!artistFieldLabel.trim()) return;
+
+                const newF: CustomFieldDefinition = {
+                  id: `art_field_${Date.now()}`,
+                  key: artistFieldLabel.trim().toLowerCase().replace(/\s+/g, '_'),
+                  label: artistFieldLabel.trim(),
+                  description: artistFieldDesc.trim() || 'Field kustom entri artis',
+                  type: artistFieldType,
+                  order: artistFields.length + 1,
+                  isSystem: false,
+                };
+
+                const updated = [...artistFields, newF];
+                setArtistFields(updated);
+                saveArtistFields(updated);
+                setIsArtistFieldModalOpen(false);
+              }}
+              className="p-5 space-y-4"
+            >
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-300">Nama Field Artis</label>
+                <input
+                  type="text"
+                  required
+                  value={artistFieldLabel}
+                  onChange={(e) => setArtistFieldLabel(e.target.value)}
+                  placeholder="Contoh: Media Sosial / Lokasi Lahir / Agensi"
+                  className="w-full min-h-[44px] px-3.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-300">Deskripsi Field</label>
+                <textarea
+                  rows={2}
+                  value={artistFieldDesc}
+                  onChange={(e) => setArtistFieldDesc(e.target.value)}
+                  placeholder="Penjelasan fungsi field ini pada profil artis..."
+                  className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-300">Tipe Field</label>
+                <select
+                  value={artistFieldType}
+                  onChange={(e) => setArtistFieldType(e.target.value as FieldType)}
+                  className="w-full min-h-[44px] px-3.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                >
+                  <option value="custom_text">Text (Teks Kustom)</option>
+                  <option value="number">Number (Angka - Support Dynamic Filtering)</option>
+                  <option value="button_link">Button/Link (Tombol Tautan)</option>
+                </select>
+              </div>
+
+              <button
+                type="submit"
+                className="w-full min-h-[46px] rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-bold text-xs uppercase tracking-wider transition shadow-lg shadow-violet-600/30 flex items-center justify-center gap-2 mt-2 cursor-pointer"
+              >
+                <Check className="w-4 h-4" />
+                <span>Simpan Field Artis</span>
               </button>
             </form>
           </div>
