@@ -196,6 +196,106 @@ export const ArtistDetailView: React.FC<ArtistDetailViewProps> = ({
     return items;
   }, [dynamicAggregatedAttributes, fieldDefinitions]);
 
+  // Calculate Artist Rank in Peran Utama based on aggregated ratings
+  const mainRoleRankDetail = useMemo(() => {
+    const mainRole = artist.textFields?.['Peran Utama']?.trim();
+    if (!mainRole) return null;
+
+    const sameRoleArtists = effectiveArtists.filter(
+      (a) => (a.textFields?.['Peran Utama'] || '').trim().toLowerCase() === mainRole.toLowerCase()
+    );
+
+    if (sameRoleArtists.length === 0) return null;
+
+    const artistScores = sameRoleArtists.map((art) => {
+      const { rating, videoCount: count, totalPoints } = calculateArtistAggregatedRating(
+        art.id,
+        effectiveVideos,
+        roleWeights,
+        effectivePivots
+      );
+      return {
+        id: art.id,
+        rating: rating ?? 0,
+        count,
+        totalPoints,
+      };
+    });
+
+    artistScores.sort((a, b) => {
+      if (b.rating !== a.rating) return b.rating - a.rating;
+      if (b.count !== a.count) return b.count - a.count;
+      return b.totalPoints - a.totalPoints;
+    });
+
+    const index = artistScores.findIndex((a) => a.id === artist.id);
+    if (index === -1) return null;
+
+    return {
+      rank: index + 1,
+      total: sameRoleArtists.length,
+      roleName: mainRole,
+    };
+  }, [artist, effectiveArtists, effectiveVideos, roleWeights, effectivePivots]);
+
+  // Overall Rating Rank among all artists
+  const overallRatingRankDetail = useMemo(() => {
+    if (effectiveArtists.length === 0) return null;
+
+    const scores = effectiveArtists.map((art) => {
+      const { rating, videoCount: count, totalPoints } = calculateArtistAggregatedRating(
+        art.id,
+        effectiveVideos,
+        roleWeights,
+        effectivePivots
+      );
+      return { id: art.id, rating: rating ?? 0, count, totalPoints };
+    });
+
+    scores.sort((a, b) => {
+      if (b.rating !== a.rating) return b.rating - a.rating;
+      if (b.count !== a.count) return b.count - a.count;
+      return b.totalPoints - a.totalPoints;
+    });
+
+    const index = scores.findIndex((a) => a.id === artist.id);
+    if (index === -1) return null;
+
+    return {
+      rank: index + 1,
+      total: effectiveArtists.length,
+    };
+  }, [artist.id, effectiveArtists, effectiveVideos, roleWeights, effectivePivots]);
+
+  // Video Average Rank among all artists
+  const videoAverageRankDetail = useMemo(() => {
+    if (effectiveArtists.length === 0) return null;
+
+    const scores = effectiveArtists.map((art) => {
+      const { videoOverallAverage, videoCount: count, totalPoints } = calculateArtistAggregatedRating(
+        art.id,
+        effectiveVideos,
+        roleWeights,
+        effectivePivots
+      );
+      return { id: art.id, avg: videoOverallAverage ?? 0, count, totalPoints };
+    });
+
+    scores.sort((a, b) => {
+      if (b.avg !== a.avg) return b.avg - a.avg;
+      if (b.count !== a.count) return b.count - a.count;
+      return b.totalPoints - a.totalPoints;
+    });
+
+    const index = scores.findIndex((a) => a.id === artist.id);
+    if (index === -1) return null;
+
+    return {
+      rank: index + 1,
+      total: effectiveArtists.length,
+    };
+  }, [artist.id, effectiveArtists, effectiveVideos, roleWeights, effectivePivots]);
+
   // Calculate Artist Age automatically from birthMonthYear (Poin 5A.3)
   const artistAge = useMemo(() => {
     if (!artist.birthMonthYear) return null;
@@ -333,7 +433,7 @@ export const ArtistDetailView: React.FC<ArtistDetailViewProps> = ({
             {artist.name}
           </h1>
 
-          {/* Age & Peran Utama Dynamic Filter Trigger (Poin 6A) */}
+          {/* Age & Peran Utama Dynamic Filter Trigger (Poin 6A) with Rank Position */}
           <div className="mt-1.5 flex flex-wrap items-center justify-center gap-2">
             {artist.textFields?.['Peran Utama'] && (
               <button
@@ -343,7 +443,13 @@ export const ArtistDetailView: React.FC<ArtistDetailViewProps> = ({
                 title="Klik untuk melihat Halaman Daftar Artis terfilter Peran Utama ini"
               >
                 <span>{artist.textFields['Peran Utama']}</span>
-                <span className="text-[10px] text-indigo-400 font-extrabold">➔ Filter Artis</span>
+                {mainRoleRankDetail && (
+                  <span className="text-[10px] font-bold text-amber-300 bg-amber-950/80 px-2 py-0.5 rounded-lg border border-amber-800/80 shadow-xs flex items-center gap-1">
+                    <Trophy className="w-3 h-3 text-amber-400" />
+                    Peringkat #{mainRoleRankDetail.rank}
+                    {mainRoleRankDetail.total > 1 ? ` dari ${mainRoleRankDetail.total}` : ''}
+                  </span>
+                )}
               </button>
             )}
 
@@ -355,9 +461,10 @@ export const ArtistDetailView: React.FC<ArtistDetailViewProps> = ({
             )}
           </div>
 
-          {/* Overall Rating Big Badge (Aggregated from linked videos & Pivot SUM) */}
-          <div className="mt-4 p-3.5 w-full rounded-2xl bg-slate-950/80 border border-slate-800/80 flex items-center justify-around">
-            <div className="flex flex-col items-center">
+          {/* 3 Summary Cards (Rating, Rata-rata Video, Total Video) */}
+          <div className="mt-4 p-3.5 w-full rounded-2xl bg-slate-950/80 border border-slate-800/80 grid grid-cols-3 divide-x divide-slate-800/80">
+            {/* Rating Card */}
+            <div className="flex flex-col items-center px-1 text-center">
               <span className="text-[10px] uppercase tracking-wider text-amber-300 font-bold">
                 Rating
               </span>
@@ -371,34 +478,57 @@ export const ArtistDetailView: React.FC<ArtistDetailViewProps> = ({
                     : '-'}
                 </span>
               </div>
-              <span className="text-[9px] text-slate-400 font-medium mt-0.5">
-                {totalPivotScore > 0
-                  ? `Poin: ${Number.isInteger(totalPivotScore) ? totalPivotScore : totalPivotScore.toFixed(1)}`
-                  : 'Relasi peran'}
+              <span className="text-[9px] text-amber-300/90 font-bold mt-1 flex items-center justify-center gap-0.5">
+                {overallRatingRankDetail ? (
+                  <>
+                    <Trophy className="w-2.5 h-2.5 text-amber-400 shrink-0" />
+                    <span>Peringkat #{overallRatingRankDetail.rank}</span>
+                  </>
+                ) : (
+                  '-'
+                )}
               </span>
             </div>
 
-            <div className="h-10 w-px bg-slate-800" />
-
-            <div className="flex flex-col items-center">
-              <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">
+            {/* Rata-rata Video Card */}
+            <div className="flex flex-col items-center px-1 text-center">
+              <span className="text-[10px] uppercase tracking-wider text-emerald-400 font-bold">
                 Rata-rata Video
               </span>
-              <div className="mt-1 flex items-center gap-1">
-                <RatingBadge score={rawVideoAverage} size="md" showIcon />
+              <div className="mt-1 flex items-center gap-1.5">
+                <Star className="w-5 h-5 text-emerald-400 fill-emerald-400" />
+                <span className="text-2xl font-black text-emerald-300">
+                  {rawVideoAverage > 0
+                    ? Number.isInteger(rawVideoAverage)
+                      ? rawVideoAverage
+                      : rawVideoAverage.toFixed(1)
+                    : '-'}
+                </span>
               </div>
+              <span className="text-[9px] text-emerald-300/90 font-bold mt-1 flex items-center justify-center gap-0.5">
+                {videoAverageRankDetail ? (
+                  <>
+                    <Trophy className="w-2.5 h-2.5 text-emerald-400 shrink-0" />
+                    <span>Peringkat #{videoAverageRankDetail.rank}</span>
+                  </>
+                ) : (
+                  '-'
+                )}
+              </span>
             </div>
 
-            <div className="h-10 w-px bg-slate-800" />
-
-            <div className="flex flex-col items-center">
-              <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">
-                Video Tertaut
+            {/* Total Video Card */}
+            <div className="flex flex-col items-center px-1 text-center">
+              <span className="text-[10px] uppercase tracking-wider text-indigo-400 font-bold">
+                Total Video
               </span>
-              <div className="mt-1 text-2xl font-black text-white flex items-center gap-1.5">
+              <div className="mt-1 flex items-center gap-1.5">
                 <Film className="w-5 h-5 text-indigo-400" />
-                <span>{videoCount}</span>
+                <span className="text-2xl font-black text-white">{videoCount}</span>
               </div>
+              <span className="text-[9px] text-slate-400 font-medium mt-1">
+                Karya Tertaut
+              </span>
             </div>
           </div>
 
