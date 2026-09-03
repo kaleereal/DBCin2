@@ -1057,6 +1057,7 @@ export const VideoFormModal: React.FC<VideoFormModalProps> = ({
                   <p className="text-xs text-slate-400">{field.description}</p>
                   <input
                     type="text"
+                    required={!!field.is_required}
                     value={customTextFields[field.id] || ''}
                     onChange={(e) =>
                       setCustomTextFields({

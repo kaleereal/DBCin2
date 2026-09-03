@@ -923,7 +923,7 @@ export const ArtistDetailView: React.FC<ArtistDetailViewProps> = ({
         </div>
       )}
 
-      {/* Modal Detail / Reader Catatan Galeri (Poin 2) */}
+      {/* Modal Detail / Reader Catatan Galeri dalam Mode Read-Only (Poin 2) */}
       {readingNote && (
         <GalleryNoteModal
           isOpen={!!readingNote}
@@ -936,6 +936,7 @@ export const ArtistDetailView: React.FC<ArtistDetailViewProps> = ({
           }}
           initialNote={readingNote}
           artists={effectiveArtists}
+          readOnlyInitial={true}
         />
       )}
 
