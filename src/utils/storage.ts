@@ -1,14 +1,16 @@
-import { Video, Artist, CustomFieldDefinition, RatingFolder, RatingTemplateFolder, VideoArtistPivot, RoleWeight } from '../types';
+import { Video, Artist, CustomFieldDefinition, RatingFolder, RatingTemplateFolder, VideoArtistPivot, RoleWeight, GalleryNote } from '../types';
 
 const STORAGE_KEYS = {
   VIDEOS: 'cinerate_videos_v1',
   ARTISTS: 'cinerate_artists_v1',
   FIELDS: 'cinerate_fields_v1',
+  ARTIST_FIELDS: 'cinerate_artist_fields_v1',
   RATING_TEMPLATES: 'cinerate_rating_templates_v1',
   VIDEO_VIEW_MODE: 'cinerate_video_view_mode_v1',
   ARTIST_VIEW_MODE: 'cinerate_artist_view_mode_v1',
   PIVOTS: 'cinerate_video_artist_pivots_v1',
   ROLE_WEIGHTS: 'cinerate_role_weights_v1',
+  GALLERY_NOTES: 'cinerate_gallery_notes_v1',
 };
 
 // Calculate overall rating from multiple rating folders and items (0 - 100)
@@ -46,13 +48,13 @@ export function calculateOverallRating(
 }
 
 // Calculate artist overall rating aggregated from all linked videos (0 - 100)
-// Sesuai aturan:
-// - Nilai video utama (overallRating) hanya nilai rata-rata entri video itu sendiri.
-// - Rating Artis yang ditampilkan di seluruh aplikasi menghitung RATA-RATA nilai yang
-//   didapatkan artis tersebut dari daftar entri video yang tertaut berdasarkan rumus
-//   aturan relasi nilai & bobot status peran:
-//     nilai_didapat = (video.overallRating * bobot_status_peran) / 100
-//     rating_artis  = sum(nilai_didapat) / jumlah_video_tertaut
+// Sesuai Aturan Rumus Baku Baru (Poin 2):
+// V = Nilai Video Utama
+// S = Bobot Status Peran (%)
+// P = Nilai Performa (0-100)
+// Hasil Satu = (V * S) / 100
+// Hasil Dua = (V * P) / 100
+// Nilai Didapat Artis = (Hasil Satu + Hasil Dua) / 2 = (V * (S + P)) / 200
 export function calculateArtistAggregatedRating(
   artistId: string,
   videos: Video[],
@@ -69,6 +71,7 @@ export function calculateArtistAggregatedRating(
     videoOverallRating: number;
     roleName: string;
     weight: number;
+    performance: number;
     scoreObtained: number;
   }[];
 } {
@@ -99,7 +102,6 @@ export function calculateArtistAggregatedRating(
     const roleName = (vid.artistRoles?.[artistId] || 'Artis Utama').trim();
     const roleKey = roleName.toLowerCase();
 
-    // Cek apakah ada pivot tersimpan dan apakah perannya sedang terkunci
     const matchedRw = weights.find((rw) => rw.roleName.toLowerCase().trim() === roleKey);
     const existingPivot = pivotMap.get(vid.id);
 
@@ -113,8 +115,12 @@ export function calculateArtistAggregatedRating(
         ? vid.overallRating
         : 0;
 
-    const rawScore = (videoOverallRating * weight) / 100;
-    const scoreObtained = Math.round(rawScore * 10) / 10;
+    let performance = vid.artistPerformances?.[artistId];
+    if (typeof performance !== 'number' || isNaN(performance)) {
+      performance = existingPivot?.nilai_performa !== undefined ? existingPivot.nilai_performa : weight;
+    }
+
+    const rawScore = calculatePivotScore(videoOverallRating, weight, performance);
 
     return {
       videoId: vid.id,
@@ -122,7 +128,8 @@ export function calculateArtistAggregatedRating(
       videoOverallRating,
       roleName,
       weight,
-      scoreObtained,
+      performance,
+      scoreObtained: rawScore,
     };
   });
 
@@ -1019,11 +1026,19 @@ export function savePivots(pivots: VideoArtistPivot[]) {
 }
 
 /**
- * Hitung nilai yang didapat:
- * Nilai yang Didapat Artis = (Nilai Keseluruhan Video × Bobot Status Peran) / 100
+ * Hitung nilai yang didapat dengan RUMUS BAKU:
+ * V = videoOverallRating
+ * S = weightPercent (Bobot Status Peran %)
+ * P = performancePercent (Nilai Performa %)
+ * Hasil Satu = (V * S) / 100
+ * Hasil Dua = (V * P) / 100
+ * Nilai Didapat Artis = (Hasil Satu + Hasil Dua) / 2 = (V * (S + P)) / 200
  */
-export function calculatePivotScore(videoOverallRating: number, weightPercent: number): number {
-  const raw = (videoOverallRating * weightPercent) / 100;
+export function calculatePivotScore(videoOverallRating: number, weightPercent: number, performancePercent: number): number {
+  const S = typeof weightPercent === 'number' ? weightPercent : 100;
+  const P = typeof performancePercent === 'number' ? performancePercent : S;
+  const V = typeof videoOverallRating === 'number' ? videoOverallRating : 0;
+  const raw = (V * (S + P)) / 200;
   return Math.round(raw * 10) / 10;
 }
 
@@ -1036,19 +1051,22 @@ export function recalculateVideoPivots(
   roleWeights: RoleWeight[],
   existingPivots: VideoArtistPivot[]
 ): VideoArtistPivot[] {
-  // Ambil semua pivot selain video ini
   const otherPivots = existingPivots.filter((p) => p.videoId !== video.id);
 
-  // Buat snapshot pivot baru untuk artis yang tertaut saat ini
   const newVideoPivots: VideoArtistPivot[] = (video.artistIds || []).map((artistId) => {
     const roleText = (video.artistRoles?.[artistId] || 'Artis Utama').trim();
     
-    // Cari bobot terkini untuk status peran ini
     const matchedRole = roleWeights.find(
       (rw) => rw.roleName.toLowerCase().trim() === roleText.toLowerCase()
     );
     const weight = matchedRole ? matchedRole.weight : 100;
-    const score = calculatePivotScore(video.overallRating || 0, weight);
+
+    let performance = video.artistPerformances?.[artistId];
+    if (typeof performance !== 'number' || isNaN(performance)) {
+      performance = weight;
+    }
+
+    const score = calculatePivotScore(video.overallRating || 0, weight, performance);
 
     return {
       videoId: video.id,
@@ -1057,6 +1075,7 @@ export function recalculateVideoPivots(
       nilai_didapat: score,
       status_peran_saat_itu: roleText,
       bobot_saat_itu: weight,
+      nilai_performa: performance,
     };
   });
 
@@ -1072,19 +1091,16 @@ export function recalculateAllVideoPivots(
   roleWeights: RoleWeight[],
   existingPivots: VideoArtistPivot[]
 ): { updatedPivots: VideoArtistPivot[]; recalculatedCount: number; skippedLockedCount: number } {
-  const lockedRolesMap = new Map<string, boolean>();
   const currentWeightMap = new Map<string, number>();
 
   roleWeights.forEach((rw) => {
     const key = rw.roleName.toLowerCase().trim();
-    lockedRolesMap.set(key, rw.isLocked);
     currentWeightMap.set(key, rw.weight);
   });
 
   let recalculatedCount = 0;
   let skippedLockedCount = 0;
 
-  // Bangun pivot baru per video
   const newPivots: VideoArtistPivot[] = [];
 
   videos.forEach((video) => {
@@ -1092,32 +1108,30 @@ export function recalculateAllVideoPivots(
     artistIds.forEach((artistId) => {
       const roleText = (video.artistRoles?.[artistId] || 'Artis Utama').trim();
       const roleKey = roleText.toLowerCase();
-      const isLocked = lockedRolesMap.get(roleKey) || false;
 
-      // Cari pivot lama jika ada
       const oldPivot = existingPivots.find(
         (p) => p.videoId === video.id && p.artistId === artistId
       );
 
-      if (isLocked && oldPivot) {
-        // PERTAHANKAN snapshot lama karena status peran terkunci
-        newPivots.push(oldPivot);
-        skippedLockedCount++;
-      } else {
-        // Hitung ulang dengan bobot terbaru
-        const weight = currentWeightMap.has(roleKey) ? currentWeightMap.get(roleKey)! : 100;
-        const score = calculatePivotScore(video.overallRating || 0, weight);
+      const weight = currentWeightMap.has(roleKey) ? currentWeightMap.get(roleKey)! : (oldPivot?.bobot_saat_itu ?? 100);
 
-        newPivots.push({
-          videoId: video.id,
-          artistId,
-          createdAt: oldPivot?.createdAt || new Date().toISOString(),
-          nilai_didapat: score,
-          status_peran_saat_itu: roleText,
-          bobot_saat_itu: weight,
-        });
-        recalculatedCount++;
+      let performance = video.artistPerformances?.[artistId];
+      if (typeof performance !== 'number' || isNaN(performance)) {
+        performance = oldPivot?.nilai_performa !== undefined ? oldPivot.nilai_performa : weight;
       }
+
+      const score = calculatePivotScore(video.overallRating || 0, weight, performance);
+
+      newPivots.push({
+        videoId: video.id,
+        artistId,
+        createdAt: oldPivot?.createdAt || new Date().toISOString(),
+        nilai_didapat: score,
+        status_peran_saat_itu: roleText,
+        bobot_saat_itu: weight,
+        nilai_performa: performance,
+      });
+      recalculatedCount++;
     });
   });
 
@@ -1420,6 +1434,131 @@ export function importDataJson(jsonString: string): { success: boolean; message:
   } catch (e) {
     console.error('Gagal import JSON:', e);
     return { success: false, message: 'Format berkas cadangan rusak atau tidak valid.' };
+  }
+}
+
+/**
+ * Riwayat status peran DINAMIS (Bukan Hardcoded):
+ * - BERTAMBAH apabila ada entri video baru yang menggunakan status peran baru.
+ * - TERHAPUS secara otomatis apabila sudah tidak ada satupun entri video di seluruh sistem yang menggunakan status peran tersebut.
+ */
+export function getDynamicRoleHistory(videos?: Video[]): string[] {
+  const targetVideos = videos || getStoredVideos();
+  const roleSet = new Set<string>();
+
+  targetVideos.forEach((v) => {
+    if (v.artistRoles) {
+      Object.values(v.artistRoles).forEach((role) => {
+        const trimmed = role?.trim();
+        if (trimmed) {
+          roleSet.add(trimmed);
+        }
+      });
+    }
+  });
+
+  return Array.from(roleSet);
+}
+
+// GALLERY NOTES STORAGE API
+export const SAMPLE_GALLERY_NOTES: GalleryNote[] = [
+  {
+    id: 'note_1',
+    title: 'Catatan Karakterisasi & Akting Reza Rahadian',
+    blocks: [
+      { id: 'b1', type: 'heading', content: 'Analisis Transformasi Karakter' },
+      { id: 'b2', type: 'text', content: 'Reza Rahadian menunjukkan pendalaman vokal dan artikulasi yang luar biasa dalam peran biopic.', bold: true },
+      { id: 'b3', type: 'bullet_list', content: 'Transformasi suara dan gestur fisik' },
+      { id: 'b4', type: 'bullet_list', content: 'Kontrol emosi pada adegan monolog dramatis' },
+    ],
+    linkedArtistIds: ['art_1'],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+];
+
+export function getStoredGalleryNotes(): GalleryNote[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.GALLERY_NOTES);
+    if (!raw) {
+      localStorage.setItem(STORAGE_KEYS.GALLERY_NOTES, JSON.stringify(SAMPLE_GALLERY_NOTES));
+      return SAMPLE_GALLERY_NOTES;
+    }
+    return JSON.parse(raw);
+  } catch {
+    return SAMPLE_GALLERY_NOTES;
+  }
+}
+
+export function saveGalleryNotes(notes: GalleryNote[]) {
+  try {
+    localStorage.setItem(STORAGE_KEYS.GALLERY_NOTES, JSON.stringify(notes));
+    notify();
+  } catch (err) {
+    console.error('Gagal menyimpan catatan gallery:', err);
+  }
+}
+
+// ARTIST CUSTOM FIELDS API ("Struktur & Urutan Field Artis")
+export const DEFAULT_ARTIST_FIELDS: CustomFieldDefinition[] = [
+  {
+    id: 'art_field_notes',
+    key: 'galleryNoteIds',
+    label: 'Field Galeri Catatan',
+    description: 'Menghubungkan entri artis ke halaman Catatan Gallery yang baru dibuat.',
+    type: 'gallery_notes',
+    order: 1,
+    isSystem: true, // TIDAK BISA dihapus
+  },
+  {
+    id: 'art_field_birth',
+    key: 'birthMonthYear',
+    label: 'Field Bulan-Tahun Lahir',
+    description: 'Mengatur tanggal/bulan-tahun lahir untuk kalkulasi Umur otomatis.',
+    type: 'month_year',
+    order: 2,
+    isSystem: true, // TIDAK BISA dihapus
+  },
+  {
+    id: 'art_field_button',
+    key: 'links',
+    label: 'Field Tombol Link / Media Sosial',
+    description: 'Tombol tautan portofolio, IMDb, Wikipedia, atau media sosial artis.',
+    type: 'button_link',
+    order: 3,
+    isSystem: false, // Bisa dihapus / ditambah
+  },
+  {
+    id: 'art_field_peran_utama',
+    key: 'Peran Utama',
+    label: 'Peran / Profesi Utama',
+    description: 'Status peran utama artis (Aktor, Sutradara, dll.) dengan dukungan Dynamic Filtering.',
+    type: 'custom_text',
+    order: 4,
+    isSystem: false,
+  },
+];
+
+export function getStoredArtistFields(): CustomFieldDefinition[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.ARTIST_FIELDS);
+    if (!raw) {
+      localStorage.setItem(STORAGE_KEYS.ARTIST_FIELDS, JSON.stringify(DEFAULT_ARTIST_FIELDS));
+      return DEFAULT_ARTIST_FIELDS;
+    }
+    const parsed: CustomFieldDefinition[] = JSON.parse(raw);
+    return parsed.sort((a, b) => a.order - b.order);
+  } catch {
+    return DEFAULT_ARTIST_FIELDS;
+  }
+}
+
+export function saveArtistFields(fields: CustomFieldDefinition[]) {
+  try {
+    localStorage.setItem(STORAGE_KEYS.ARTIST_FIELDS, JSON.stringify(fields));
+    notify();
+  } catch (err) {
+    console.error('Gagal menyimpan definisi field artis:', err);
   }
 }
 

@@ -15,6 +15,10 @@ import {
   ChevronDown,
   ChevronUp,
   Trash2,
+  TrendingUp,
+  ArrowUpDown,
+  Calendar,
+  Award,
 } from 'lucide-react';
 import { Artist, Video, CustomFieldDefinition, VideoArtistPivot } from '../types';
 import {
@@ -55,10 +59,14 @@ export const ArtistDetailView: React.FC<ArtistDetailViewProps> = ({
   onSelectFilterTag,
   onFilterByRole,
 }) => {
-  const [activeSubTab, setActiveSubTab] = useState<'videos' | 'notes'>('videos');
+  const [activeSubTab, setActiveSubTab] = useState<'videos' | 'performance' | 'notes'>('videos');
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
   const [isFootnoteOpen, setIsFootnoteOpen] = useState(false);
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
+
+  // Sorting state for Performance Table
+  const [perfSortKey, setPerfSortKey] = useState<'performance' | 'score' | 'release' | 'title'>('performance');
+  const [perfSortOrder, setPerfSortOrder] = useState<'desc' | 'asc'>('desc');
 
   // Fallback ke penyimpanan jika prop kosong
   const effectiveVideos = useMemo(
@@ -183,6 +191,60 @@ export const ArtistDetailView: React.FC<ArtistDetailViewProps> = ({
     return items;
   }, [dynamicAggregatedAttributes, fieldDefinitions]);
 
+  // Calculate Artist Age automatically from birthMonthYear (Poin 5A.3)
+  const artistAge = useMemo(() => {
+    if (!artist.birthMonthYear) return null;
+    const [yearStr, monthStr] = artist.birthMonthYear.split('-');
+    const birthYear = parseInt(yearStr, 10);
+    const birthMonth = parseInt(monthStr, 10);
+
+    if (isNaN(birthYear) || isNaN(birthMonth)) return null;
+
+    const today = new Date();
+    let age = today.getFullYear() - birthYear;
+    if (today.getMonth() + 1 < birthMonth) {
+      age--;
+    }
+    return age >= 0 ? age : null;
+  }, [artist.birthMonthYear]);
+
+  // Performance Table List sorted dynamically
+  const sortedPerformanceList = useMemo(() => {
+    const list = linkedVideos.map((vid) => {
+      const scoreInfo = videoScores?.find((vs) => vs.videoId === vid.id);
+      const roleName = scoreInfo?.roleName || vid.artistRoles?.[artist.id] || 'Artis Utama';
+      const performance = scoreInfo?.performance ?? scoreInfo?.weight ?? 100;
+      const scoreObtained = scoreInfo?.scoreObtained ?? vid.overallRating;
+
+      // Collaborator names in video
+      const collaborators = (vid.artistIds || [])
+        .filter((id) => id !== artist.id)
+        .map((id) => effectiveArtists.find((a) => a.id === id)?.name)
+        .filter(Boolean) as string[];
+
+      return {
+        video: vid,
+        roleName,
+        performance,
+        scoreObtained,
+        collaborators,
+        releaseDate: vid.releaseDate || vid.createdAt,
+      };
+    });
+
+    list.sort((a, b) => {
+      let diff = 0;
+      if (perfSortKey === 'performance') diff = b.performance - a.performance;
+      else if (perfSortKey === 'score') diff = b.scoreObtained - a.scoreObtained;
+      else if (perfSortKey === 'release') diff = new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime();
+      else if (perfSortKey === 'title') diff = a.video.title.localeCompare(b.video.title);
+
+      return perfSortOrder === 'desc' ? diff : -diff;
+    });
+
+    return list;
+  }, [linkedVideos, videoScores, artist.id, effectiveArtists, perfSortKey, perfSortOrder]);
+
   const coverUrl =
     artist.coverUrl ||
     'https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c?w=1000&auto=format&fit=crop&q=80';
@@ -256,17 +318,27 @@ export const ArtistDetailView: React.FC<ArtistDetailViewProps> = ({
             {artist.name}
           </h1>
 
-          {artist.textFields?.['Peran Utama'] && (
-            <button
-              type="button"
-              onClick={() => onFilterByRole && onFilterByRole(artist.textFields['Peran Utama'])}
-              className="mt-1 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-950/80 hover:bg-indigo-900 border border-indigo-700/60 text-xs font-bold text-indigo-300 hover:text-white transition active:scale-95 cursor-pointer shadow-xs"
-              title="Klik untuk melihat peringkat artis dengan Peran Utama ini"
-            >
-              <span>{artist.textFields['Peran Utama']}</span>
-              <span className="text-[10px] text-indigo-400">➔ Peringkat</span>
-            </button>
-          )}
+          {/* Age & Peran Utama Dynamic Filter Trigger (Poin 6A) */}
+          <div className="mt-1.5 flex flex-wrap items-center justify-center gap-2">
+            {artist.textFields?.['Peran Utama'] && (
+              <button
+                type="button"
+                onClick={() => onFilterByRole && onFilterByRole(artist.textFields['Peran Utama'])}
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-950/80 hover:bg-indigo-900 border border-indigo-700/60 text-xs font-bold text-indigo-300 hover:text-white transition active:scale-95 cursor-pointer shadow-xs"
+                title="Klik untuk melihat Halaman Daftar Artis terfilter Peran Utama ini"
+              >
+                <span>{artist.textFields['Peran Utama']}</span>
+                <span className="text-[10px] text-indigo-400 font-extrabold">➔ Filter Artis</span>
+              </button>
+            )}
+
+            {artistAge !== null && (
+              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-slate-800 border border-slate-700 text-xs font-bold text-slate-300">
+                <Calendar className="w-3 h-3 text-indigo-400" />
+                <span>{artistAge} Tahun</span>
+              </span>
+            )}
+          </div>
 
           {/* Overall Rating Big Badge (Aggregated from linked videos & Pivot SUM) */}
           <div className="mt-4 p-3.5 w-full rounded-2xl bg-slate-950/80 border border-slate-800/80 flex items-center justify-around">
@@ -378,29 +450,40 @@ export const ArtistDetailView: React.FC<ArtistDetailViewProps> = ({
         </div>
       </div>
 
-      {/* Tab Switcher: "Video Terkait" | "Catatan & Profil" (Geser horizontal untuk berpindah tab) */}
+      {/* Tab Switcher: "Video Terkait" | "Performa" (New) | "Catatan & Profil" (Poin 6B) */}
       <div className="flex rounded-2xl bg-slate-900/90 p-1 border border-slate-800 shadow-inner">
         <button
           onClick={() => setActiveSubTab('videos')}
-          className={`flex-1 min-h-[44px] rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 ${
+          className={`flex-1 min-h-[44px] rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
             activeSubTab === 'videos'
               ? 'bg-indigo-600 text-white shadow-md'
               : 'text-slate-400 hover:text-slate-200'
           }`}
         >
           <Film className="w-4 h-4" />
-          <span>Video Terkait ({linkedVideos.length})</span>
+          <span>Video ({linkedVideos.length})</span>
+        </button>
+        <button
+          onClick={() => setActiveSubTab('performance')}
+          className={`flex-1 min-h-[44px] rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+            activeSubTab === 'performance'
+              ? 'bg-indigo-600 text-white shadow-md'
+              : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <TrendingUp className="w-4 h-4" />
+          <span>Performa</span>
         </button>
         <button
           onClick={() => setActiveSubTab('notes')}
-          className={`flex-1 min-h-[44px] rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 ${
+          className={`flex-1 min-h-[44px] rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
             activeSubTab === 'notes'
               ? 'bg-indigo-600 text-white shadow-md'
               : 'text-slate-400 hover:text-slate-200'
           }`}
         >
           <User className="w-4 h-4" />
-          <span>Catatan &amp; Profil</span>
+          <span>Profil</span>
         </button>
       </div>
 
@@ -487,7 +570,138 @@ export const ArtistDetailView: React.FC<ArtistDetailViewProps> = ({
         </div>
       )}
 
-      {/* Tab 2: Catatan & Profil (Tampilan bersih seperti sosial media) */}
+      {/* Tab 2: Section Baru "Performa" Table View (Poin 6B) */}
+      {activeSubTab === 'performance' && (
+        <div className="space-y-3 animate-in fade-in">
+          {/* Table Control / Sort Bar */}
+          <div className="p-3 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-between gap-2 flex-wrap text-xs">
+            <span className="font-bold text-slate-300 flex items-center gap-1.5">
+              <TrendingUp className="w-4 h-4 text-indigo-400" />
+              <span>Daftar Performa Artis (Table View)</span>
+            </span>
+
+            {/* Sort Buttons */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-slate-400 font-semibold">Sortir:</span>
+              <button
+                type="button"
+                onClick={() => {
+                  if (perfSortKey === 'performance') setPerfSortOrder(perfSortOrder === 'desc' ? 'asc' : 'desc');
+                  else { setPerfSortKey('performance'); setPerfSortOrder('desc'); }
+                }}
+                className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition ${
+                  perfSortKey === 'performance' ? 'bg-indigo-600 text-white' : 'bg-slate-950 text-slate-400 hover:bg-slate-800'
+                }`}
+              >
+                Nilai P {perfSortKey === 'performance' ? (perfSortOrder === 'desc' ? '↓' : '↑') : ''}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (perfSortKey === 'score') setPerfSortOrder(perfSortOrder === 'desc' ? 'asc' : 'desc');
+                  else { setPerfSortKey('score'); setPerfSortOrder('desc'); }
+                }}
+                className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition ${
+                  perfSortKey === 'score' ? 'bg-indigo-600 text-white' : 'bg-slate-950 text-slate-400 hover:bg-slate-800'
+                }`}
+              >
+                Nilai Didapat {perfSortKey === 'score' ? (perfSortOrder === 'desc' ? '↓' : '↑') : ''}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (perfSortKey === 'release') setPerfSortOrder(perfSortOrder === 'desc' ? 'asc' : 'desc');
+                  else { setPerfSortKey('release'); setPerfSortOrder('desc'); }
+                }}
+                className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition ${
+                  perfSortKey === 'release' ? 'bg-indigo-600 text-white' : 'bg-slate-950 text-slate-400 hover:bg-slate-800'
+                }`}
+              >
+                Tgl Rilis {perfSortKey === 'release' ? (perfSortOrder === 'desc' ? '↓' : '↑') : ''}
+              </button>
+            </div>
+          </div>
+
+          {/* Table Container (Mobile-Friendly Responsive Table) */}
+          {sortedPerformanceList.length === 0 ? (
+            <div className="text-center py-12 px-4 rounded-3xl bg-slate-900/50 border border-slate-800/80">
+              <Film className="w-10 h-10 text-slate-600 mx-auto mb-2" />
+              <p className="text-sm font-bold text-slate-300">Belum ada video untuk menampilkan performa</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900 shadow-md">
+              <table className="w-full text-left text-xs text-slate-300">
+                <thead className="bg-slate-950/80 text-[10px] text-slate-400 uppercase tracking-wider border-b border-slate-800">
+                  <tr>
+                    <th className="p-3">Video</th>
+                    <th className="p-3">Kolaborator</th>
+                    <th className="p-3">Rilis</th>
+                    <th className="p-3">Peran</th>
+                    <th className="p-3 text-right">Nilai Performa &amp; Hasil</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60 font-medium">
+                  {sortedPerformanceList.map((item) => {
+                    const thumb = item.video.metadata?.thumbnailUrl || 'https://images.unsplash.com/photo-1518676590629-3dcbd9c5a5c9?w=300&auto=format&fit=crop&q=80';
+                    const rilisText = item.releaseDate ? new Date(item.releaseDate).toLocaleDateString('id-ID', { year: 'numeric', month: 'short' }) : '-';
+
+                    return (
+                      <tr
+                        key={item.video.id}
+                        onClick={() => onSelectVideo && onSelectVideo(item.video)}
+                        className="hover:bg-slate-850/60 transition cursor-pointer"
+                      >
+                        {/* Thumbnail & Judul */}
+                        <td className="p-3 min-w-[160px]">
+                          <div className="flex items-center gap-2.5">
+                            <img
+                              src={thumb}
+                              alt={item.video.title}
+                              className="w-10 h-10 rounded-lg object-cover bg-slate-950 shrink-0"
+                            />
+                            <span className="font-bold text-white line-clamp-2 leading-tight">
+                              {item.video.title}
+                            </span>
+                          </div>
+                        </td>
+
+                        {/* Kolaborator */}
+                        <td className="p-3 min-w-[120px] text-[11px] text-slate-400">
+                          {item.collaborators.length > 0 ? item.collaborators.join(', ') : 'Solo / Utama'}
+                        </td>
+
+                        {/* Tanggal Rilis */}
+                        <td className="p-3 whitespace-nowrap text-[11px] text-slate-400">
+                          {rilisText}
+                        </td>
+
+                        {/* Peran */}
+                        <td className="p-3 whitespace-nowrap font-bold text-indigo-300">
+                          {item.roleName}
+                        </td>
+
+                        {/* Nilai Performa (P) dan Nilai Didapat Artis */}
+                        <td className="p-3 text-right whitespace-nowrap">
+                          <div className="flex flex-col items-end">
+                            <span className="text-xs font-black text-amber-300 bg-amber-950/80 px-2 py-0.5 rounded border border-amber-800/80">
+                              Didapat: {item.scoreObtained}
+                            </span>
+                            <span className="text-[10px] text-slate-400 mt-0.5 font-semibold">
+                              Performa (P): {item.performance}%
+                            </span>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Tab 3: Catatan & Profil (Tampilan bersih seperti sosial media) */}
       {activeSubTab === 'notes' && (
         <div className="space-y-4 animate-in fade-in">
           {/* Bio Card */}
