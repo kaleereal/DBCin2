@@ -858,7 +858,75 @@ export function getStoredFields(): CustomFieldDefinition[] {
 
 export function saveFields(fields: CustomFieldDefinition[]) {
   try {
+    const oldFields = getStoredFields();
     localStorage.setItem(STORAGE_KEYS.FIELDS, JSON.stringify(fields));
+
+    // Sinkronisasi/Update reaktif otomatis pada data entri video yang tersimpan
+    // apabila nama judul field atau opsi itemnya diubah oleh pengguna.
+    const videos = getStoredVideos();
+    let isVideoUpdated = false;
+
+    const updatedVideos = videos.map((v) => {
+      let videoChanged = false;
+      const newSingleChoices = { ...(v.singleChoices || {}) };
+      const newMultiChoices = { ...(v.multiChoices || {}) };
+
+      oldFields.forEach((oldField) => {
+        const newField = fields.find((f) => f.id === oldField.id);
+        if (!newField) return;
+
+        // Map nama item opsi lama -> nama item opsi baru
+        if (
+          (oldField.type === 'single_choice' || oldField.type === 'multi_choice') &&
+          oldField.options &&
+          newField.options
+        ) {
+          const optionMap = new Map<string, string>();
+          oldField.options.forEach((oldOpt, idx) => {
+            if (newField.options![idx] && oldOpt !== newField.options![idx]) {
+              optionMap.set(oldOpt, newField.options![idx]);
+            }
+          });
+
+          if (optionMap.size > 0) {
+            // Update single choices
+            const currentSingle = newSingleChoices[oldField.id];
+            if (currentSingle && optionMap.has(currentSingle)) {
+              newSingleChoices[oldField.id] = optionMap.get(currentSingle)!;
+              videoChanged = true;
+            }
+
+            // Update multi choices
+            const currentMulti = newMultiChoices[oldField.id];
+            if (Array.isArray(currentMulti)) {
+              const updatedMulti = currentMulti.map((opt) =>
+                optionMap.has(opt) ? optionMap.get(opt)! : opt
+              );
+              if (JSON.stringify(updatedMulti) !== JSON.stringify(currentMulti)) {
+                newMultiChoices[oldField.id] = updatedMulti;
+                videoChanged = true;
+              }
+            }
+          }
+        }
+      });
+
+      if (videoChanged) {
+        isVideoUpdated = true;
+        return {
+          ...v,
+          singleChoices: newSingleChoices,
+          multiChoices: newMultiChoices,
+          updatedAt: new Date().toISOString(),
+        };
+      }
+      return v;
+    });
+
+    if (isVideoUpdated) {
+      localStorage.setItem(STORAGE_KEYS.VIDEOS, JSON.stringify(updatedVideos));
+    }
+
     notify();
   } catch (err) {
     console.error('Gagal menyimpan definisi field:', err);
