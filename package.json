@@ -7,6 +7,7 @@
     "dev": "vite --port=3000 --host=0.0.0.0",
     "build": "vite build",
     "preview": "vite preview",
+    "build:apk": "vite build && cap sync && cd android && ./gradlew assembleDebug",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit"
   },
@@ -23,6 +24,9 @@
     "motion": "^12.23.24"
   },
   "devDependencies": {
+    "@capacitor/android": "^8.5.1",
+    "@capacitor/cli": "^8.5.1",
+    "@capacitor/core": "^8.5.1",
     "@types/express": "^4.17.21",
     "@types/node": "^22.14.0",
     "autoprefixer": "^10.4.21",

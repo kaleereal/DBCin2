@@ -41,6 +41,7 @@ export interface Video {
   title: string;
   url: string;
   metadata?: VideoMetadata;
+  fallbackThumbnailUrl?: string; // Fallback manual thumbnail URL (Poin 5)
   notes?: string;
   ratingFolders: RatingFolder[];
   overallRating: number; // Computed 0 - 100
@@ -48,8 +49,8 @@ export interface Video {
   artistRoles?: Record<string, string>; // artistId -> status_peran (e.g. "Artis Utama", "Aktor")
   artistPerformances?: Record<string, number>; // artistId -> Nilai Performa (P) 0 - 100
   releaseDate?: string; // Tanggal rilis video (YYYY-MM-DD)
-  singleChoices: Record<string, string>; // fieldId -> selectedOption
-  multiChoices: Record<string, string[]>; // fieldId -> selectedOptions[]
+  singleChoices: Record<string, string>; // fieldId -> selectedOptionId or optionName
+  multiChoices: Record<string, string[]>; // fieldId -> selectedOptionIds[] or optionNames[]
   customFields?: Record<string, string>; // for arbitrary custom text fields
   createdAt: string;
   updatedAt: string;
@@ -111,6 +112,12 @@ export type FieldType =
   | 'number'
   | 'release_date';
 
+export interface MasterOptionItem {
+  id: string;
+  name: string;
+  description?: string;
+}
+
 export interface CustomFieldDefinition {
   id: string;
   key: string;
@@ -119,11 +126,67 @@ export interface CustomFieldDefinition {
   type: FieldType;
   order: number;
   required?: boolean;
+  is_required?: boolean; // Dynamic required flag (Poin 2)
   isSystem?: boolean; // System fields cannot be deleted but can be reordered & renamed
-  options?: string[]; // For single_choice and multi_choice
+  options?: string[]; // Legacy options array
+  optionItems?: MasterOptionItem[]; // Master Normalized Tag/Options (Poin 1 - ID Reference)
   optionDescriptions?: Record<string, string>; // Optional description per option item
   defaultFolderNames?: string[]; // For rating_folder defaults
   maxEntries?: number;
+  targetEntryTypeId?: string; // For Many-to-Many relation to other entry types
+}
+
+export interface EntryTypeDefinition {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  iconName?: string;
+  fields: CustomFieldDefinition[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface GenericEntry {
+  id: string;
+  entryTypeId: string;
+  title: string;
+  fieldsData: Record<string, any>; // fieldId -> value
+  relatedEntryIds?: Record<string, string[]>; // fieldId -> targetEntryIds
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ThemeSettings {
+  mode: 'dark' | 'light';
+  fontSize: 'sm' | 'md' | 'lg' | 'xl';
+  colors: {
+    bg: string;
+    card: string;
+    cardBorder: string;
+    textPrimary: string;
+    textSecondary: string;
+    primary: string;
+    accent: string;
+    danger: string;
+  };
+}
+
+export interface NoteBlock {
+  id: string;
+  type: 'text' | 'heading' | 'bullet_list' | 'image' | 'quote';
+  content: string;
+  bold?: boolean;
+  italic?: boolean;
+}
+
+export interface GalleryNote {
+  id: string;
+  title: string;
+  blocks: NoteBlock[];
+  linkedArtistIds: string[];
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface NoteBlock {

@@ -1,10 +1,12 @@
-import { Video, Artist, CustomFieldDefinition, RatingFolder, RatingTemplateFolder, VideoArtistPivot, RoleWeight, GalleryNote } from '../types';
+import { Video, Artist, CustomFieldDefinition, RatingFolder, RatingTemplateFolder, VideoArtistPivot, RoleWeight, GalleryNote, EntryTypeDefinition, GenericEntry } from '../types';
 
 const STORAGE_KEYS = {
   VIDEOS: 'cinerate_videos_v1',
   ARTISTS: 'cinerate_artists_v1',
   FIELDS: 'cinerate_fields_v1',
   ARTIST_FIELDS: 'cinerate_artist_fields_v1',
+  ENTRY_TYPES: 'cinerate_entry_types_v1',
+  GENERIC_ENTRIES: 'cinerate_generic_entries_v1',
   RATING_TEMPLATES: 'cinerate_rating_templates_v1',
   VIDEO_VIEW_MODE: 'cinerate_video_view_mode_v1',
   ARTIST_VIEW_MODE: 'cinerate_artist_view_mode_v1',
@@ -1560,6 +1562,73 @@ export function saveArtistFields(fields: CustomFieldDefinition[]) {
   } catch (err) {
     console.error('Gagal menyimpan definisi field artis:', err);
   }
+}
+
+// CUSTOM ENTRY TYPES API (Poin 3)
+export function getStoredEntryTypes(): EntryTypeDefinition[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.ENTRY_TYPES);
+    if (!raw) return [];
+    return JSON.parse(raw);
+  } catch {
+    return [];
+  }
+}
+
+export function saveEntryTypes(entryTypes: EntryTypeDefinition[]) {
+  try {
+    localStorage.setItem(STORAGE_KEYS.ENTRY_TYPES, JSON.stringify(entryTypes));
+    notify();
+  } catch (err) {
+    console.error('Gagal menyimpan jenis entri kustom:', err);
+  }
+}
+
+// GENERIC ENTRIES API
+export function getStoredGenericEntries(): GenericEntry[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.GENERIC_ENTRIES);
+    if (!raw) return [];
+    return JSON.parse(raw);
+  } catch {
+    return [];
+  }
+}
+
+export function saveGenericEntries(entries: GenericEntry[]) {
+  try {
+    localStorage.setItem(STORAGE_KEYS.GENERIC_ENTRIES, JSON.stringify(entries));
+    notify();
+  } catch (err) {
+    console.error('Gagal menyimpan entri kustom:', err);
+  }
+}
+
+/**
+ * Normalisasi Lookup Tag/Options Reference (Poin 1):
+ * Jika opsi disimpan dalam bentuk ID atau name, resolver ini mengambil nama/label
+ * terbaru dari schema Master Field sehingga rename di pengaturan otomatis ter-reflect reaktif.
+ */
+export function resolveOptionLabel(fieldDef: CustomFieldDefinition | undefined, optionValueOrId: string): string {
+  if (!fieldDef || !optionValueOrId) return optionValueOrId || '';
+
+  // 1. Cek di optionItems (master normalized array)
+  if (fieldDef.optionItems && fieldDef.optionItems.length > 0) {
+    const matched = fieldDef.optionItems.find(
+      (item) => item.id === optionValueOrId || item.name.toLowerCase() === optionValueOrId.toLowerCase()
+    );
+    if (matched) return matched.name;
+  }
+
+  // 2. Fallback ke legacy options
+  if (fieldDef.options && fieldDef.options.length > 0) {
+    const matchedLegacy = fieldDef.options.find(
+      (opt) => opt.toLowerCase() === optionValueOrId.toLowerCase()
+    );
+    if (matchedLegacy) return matchedLegacy;
+  }
+
+  return optionValueOrId;
 }
 
 // Aliases for convenience

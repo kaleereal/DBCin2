@@ -55,6 +55,7 @@ export const VideoFormModal: React.FC<VideoFormModalProps> = ({
   const [url, setUrl] = useState('');
   const [title, setTitle] = useState('');
   const [releaseDate, setReleaseDate] = useState('');
+  const [fallbackThumbnailUrl, setFallbackThumbnailUrl] = useState('');
   const [metadata, setMetadata] = useState<VideoMetadata | undefined>(undefined);
   const [isFetchingMeta, setIsFetchingMeta] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -155,6 +156,7 @@ export const VideoFormModal: React.FC<VideoFormModalProps> = ({
       setUrl(initialVideo.url || '');
       setTitle(initialVideo.title || '');
       setReleaseDate(initialVideo.releaseDate || '');
+      setFallbackThumbnailUrl(initialVideo.fallbackThumbnailUrl || '');
       setMetadata(initialVideo.metadata);
       setNotes(initialVideo.notes || '');
       setIsNotesOpen(!!initialVideo.notes);
@@ -169,7 +171,8 @@ export const VideoFormModal: React.FC<VideoFormModalProps> = ({
       // NEW Video: load clean structure with ALL numeric fields defaulted to 0
       setUrl('');
       setTitle('');
-      setReleaseDate(new Date().toISOString().slice(0, 10)); // Today's date default for releaseDate
+      setReleaseDate(new Date().toISOString().slice(0, 10));
+      setFallbackThumbnailUrl('');
       setMetadata(undefined);
       setNotes('');
       setIsNotesOpen(false);
@@ -297,6 +300,7 @@ export const VideoFormModal: React.FC<VideoFormModalProps> = ({
       title: title.trim(),
       url: url.trim(),
       releaseDate: releaseDate || new Date().toISOString().slice(0, 10),
+      fallbackThumbnailUrl: fallbackThumbnailUrl.trim(),
       metadata,
       notes: notes.trim(),
       ratingFolders,
@@ -519,6 +523,21 @@ export const VideoFormModal: React.FC<VideoFormModalProps> = ({
                       required
                       value={releaseDate}
                       onChange={(e) => setReleaseDate(e.target.value)}
+                      className="w-full min-h-[48px] px-3.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+
+                  {/* Fallback Manual Thumbnail Field (Poin 5) */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-slate-200 flex items-center gap-1.5">
+                      <span>URL Thumbnail Fallback (Manual)</span>
+                    </label>
+                    <p className="text-xs text-slate-400">Digunakan sebagai cadangan apabila auto-extract metadata link gagal/kosong.</p>
+                    <input
+                      type="url"
+                      value={fallbackThumbnailUrl}
+                      onChange={(e) => setFallbackThumbnailUrl(e.target.value)}
+                      placeholder="https://... (URL gambar thumbnail manual)"
                       className="w-full min-h-[48px] px-3.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     />
                   </div>

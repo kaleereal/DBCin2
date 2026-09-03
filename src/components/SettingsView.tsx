@@ -31,7 +31,9 @@ import {
   AlertCircle,
   CheckCircle2,
   Copy,
+  Palette,
 } from 'lucide-react';
+import { useTheme } from '../context/ThemeContext';
 import {
   CustomFieldDefinition,
   FieldType,
@@ -75,6 +77,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   onUpdateFields,
   onRefreshData,
 }) => {
+  const { startThemeEditMode } = useTheme();
+
   // Modal for add/edit field
   const [editingField, setEditingField] = useState<CustomFieldDefinition | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -716,6 +720,27 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         <p className="text-xs text-slate-400 mt-0.5">
           Atur urutan, nama, deskripsi, serta opsi field form entri video &amp; artis
         </p>
+      </div>
+
+      {/* Section Pengaturan Tema & Tipografi (Poin 7 & 8) */}
+      <div className="rounded-3xl bg-slate-900 border border-slate-800 p-4 shadow-lg flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-indigo-600/20 text-indigo-400 flex items-center justify-center shrink-0">
+            <Palette className="w-5 h-5" />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold text-white">Sistem Tema &amp; Tipografi Dinamis</h3>
+            <p className="text-xs text-slate-400">Ubah warna dan ukuran font live dengan floating editor</p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={startThemeEditMode}
+          className="min-h-[42px] px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center gap-1.5 transition active:scale-95 cursor-pointer shrink-0 shadow-md shadow-indigo-600/30"
+        >
+          <Palette className="w-4 h-4" />
+          <span>Edit Tema</span>
+        </button>
       </div>
 
       {/* PWA Section (Collapsible, default: collapsed) */}
