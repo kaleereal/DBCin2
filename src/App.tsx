@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Film, Clapperboard, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Film, Clapperboard, CheckCircle2, AlertCircle, FileText } from 'lucide-react';
 import {
   Video,
   Artist,
@@ -42,7 +42,29 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<TabType>('home');
   const [selectedArtistId, setSelectedArtistId] = useState<string | null>(null);
   const [selectedVideoId, setSelectedVideoId] = useState<string | null>(null);
+  const [selectedGalleryNoteId, setSelectedGalleryNoteId] = useState<string | null>(null);
   const [artistRoleFilter, setArtistRoleFilter] = useState<string | null>(null);
+
+  // Hash-based URL Routing for Standalone Gallery Note Page (Requirement B.1)
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash;
+      if (hash.startsWith('#/gallery_note/')) {
+        const noteId = hash.replace('#/gallery_note/', '');
+        if (noteId) {
+          setSelectedGalleryNoteId(noteId);
+          setActiveTab('gallery_notes');
+        }
+      } else if (hash === '#/gallery_notes') {
+        setSelectedGalleryNoteId(null);
+        setActiveTab('gallery_notes');
+      }
+    };
+
+    handleHashChange();
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
 
   // Initial filter navigation state for rankings (Requirement 8)
   const [videoRankInitialFilter, setVideoRankInitialFilter] = useState<{
@@ -149,6 +171,7 @@ export default function App() {
           return {
             ...v,
             ...videoData,
+            releaseDate: videoData.releaseDate || v.releaseDate || new Date().toISOString().slice(0, 10),
             updatedAt: new Date().toISOString(),
           } as Video;
         }
@@ -163,6 +186,7 @@ export default function App() {
         id: `video_${Date.now()}`,
         title: videoData.title || 'Untitled Video',
         url: videoData.url || '',
+        releaseDate: videoData.releaseDate || new Date().toISOString().slice(0, 10),
         metadata: videoData.metadata,
         notes: videoData.notes,
         ratingFolders: videoData.ratingFolders || [],
@@ -307,7 +331,7 @@ export default function App() {
               setSelectedVideoId(null);
               setActiveTab('home');
             }}
-            className="flex items-center gap-2.5 text-left group"
+            className="flex items-center gap-2.5 text-left group cursor-pointer"
           >
             <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white shadow-lg shadow-indigo-600/30 group-hover:scale-105 transition">
               <Clapperboard className="w-5 h-5" />
@@ -323,6 +347,27 @@ export default function App() {
                 Database Video &amp; Rating Artis
               </p>
             </div>
+          </button>
+
+          {/* Quick Access Button for Catatan Gallery in Header Toolbar */}
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedArtistId(null);
+              setSelectedVideoId(null);
+              setSelectedGalleryNoteId(null);
+              setActiveTab('gallery_notes');
+              window.location.hash = '#/gallery_notes';
+            }}
+            className={`px-3 py-1.5 rounded-xl border font-bold text-xs flex items-center gap-1.5 transition active:scale-95 cursor-pointer shadow-sm ${
+              activeTab === 'gallery_notes'
+                ? 'bg-indigo-600 border-indigo-500 text-white shadow-indigo-600/30'
+                : 'bg-slate-900 hover:bg-slate-800 border-slate-800 text-indigo-300 hover:text-white'
+            }`}
+            title="Kelola & Lihat Daftar Catatan Gallery"
+          >
+            <FileText className="w-3.5 h-3.5 text-indigo-400" />
+            <span>Catatan Galeri</span>
           </button>
         </header>
 
@@ -391,6 +436,14 @@ export default function App() {
                       setSelectedArtistId(null);
                       setArtistRoleFilter(role);
                     }}
+                    onNavigateToArtistRank={() => {
+                      setSelectedArtistId(null);
+                      setActiveTab('rank_artists');
+                    }}
+                    onNavigateToVideoRank={() => {
+                      setSelectedArtistId(null);
+                      setActiveTab('rank_videos');
+                    }}
                   />
                 ) : (
                   <ArtistListView
@@ -405,11 +458,20 @@ export default function App() {
                 )
               )}
 
-              {/* TAB BARU: Catatan Gallery */}
+              {/* TAB BARU: Catatan Gallery (Standalone Page via Unique URL support) */}
               {activeTab === 'gallery_notes' && (
                 <GalleryNotesView
                   artists={artists}
+                  selectedNoteId={selectedGalleryNoteId}
                   onSelectArtist={handleSelectArtist}
+                  onSelectNote={(noteId) => {
+                    setSelectedGalleryNoteId(noteId);
+                    if (noteId) {
+                      window.location.hash = `#/gallery_note/${noteId}`;
+                    } else {
+                      window.location.hash = '#/gallery_notes';
+                    }
+                  }}
                 />
               )}
 

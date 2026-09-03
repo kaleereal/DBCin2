@@ -48,6 +48,8 @@ interface ArtistDetailViewProps {
   onSelectVideo?: (video: Video) => void;
   onSelectFilterTag?: (fieldId: string, option: string) => void;
   onFilterByRole?: (role: string) => void;
+  onNavigateToArtistRank?: () => void;
+  onNavigateToVideoRank?: () => void;
 }
 
 export const ArtistDetailView: React.FC<ArtistDetailViewProps> = ({
@@ -62,8 +64,11 @@ export const ArtistDetailView: React.FC<ArtistDetailViewProps> = ({
   onSelectVideo,
   onSelectFilterTag,
   onFilterByRole,
+  onNavigateToArtistRank,
+  onNavigateToVideoRank,
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'videos' | 'performance' | 'notes'>('videos');
+  const [videoListMode, setVideoListMode] = useState<'grid' | 'list'>('grid');
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
   const [isFootnoteOpen, setIsFootnoteOpen] = useState(false);
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
@@ -463,13 +468,17 @@ export const ArtistDetailView: React.FC<ArtistDetailViewProps> = ({
 
           {/* 3 Summary Cards (Rating, Rata-rata Video, Total Video) */}
           <div className="mt-4 p-3.5 w-full rounded-2xl bg-slate-950/80 border border-slate-800/80 grid grid-cols-3 divide-x divide-slate-800/80">
-            {/* Rating Card */}
-            <div className="flex flex-col items-center px-1 text-center">
-              <span className="text-[10px] uppercase tracking-wider text-amber-300 font-bold">
-                Rating
+            {/* Rating Card (Interactive Navigation to Halaman Rank Artis - Requirement B.3) */}
+            <div
+              onClick={() => onNavigateToArtistRank && onNavigateToArtistRank()}
+              className="flex flex-col items-center px-1 text-center cursor-pointer hover:bg-slate-900/80 rounded-xl transition p-1 group"
+              title="Klik untuk melihat Halaman Rank Artis"
+            >
+              <span className="text-[10px] uppercase tracking-wider text-amber-300 font-bold group-hover:underline">
+                Nilai Rating Artis ➔
               </span>
               <div className="mt-1 flex items-center gap-1.5">
-                <Star className="w-5 h-5 text-amber-400 fill-amber-400" />
+                <Star className="w-5 h-5 text-amber-400 fill-amber-400 group-hover:scale-110 transition" />
                 <span className="text-2xl font-black text-amber-300">
                   {artistRating > 0
                     ? Number.isInteger(artistRating)
@@ -490,13 +499,17 @@ export const ArtistDetailView: React.FC<ArtistDetailViewProps> = ({
               </span>
             </div>
 
-            {/* Rata-rata Video Card */}
-            <div className="flex flex-col items-center px-1 text-center">
-              <span className="text-[10px] uppercase tracking-wider text-emerald-400 font-bold">
-                Rata-rata Video
+            {/* Rata-rata Video Card (Interactive Navigation to Halaman Rank Video - Requirement B.3) */}
+            <div
+              onClick={() => onNavigateToVideoRank && onNavigateToVideoRank()}
+              className="flex flex-col items-center px-1 text-center cursor-pointer hover:bg-slate-900/80 rounded-xl transition p-1 group"
+              title="Klik untuk melihat Halaman Rank Video"
+            >
+              <span className="text-[10px] uppercase tracking-wider text-emerald-400 font-bold group-hover:underline">
+                Nilai Rata-rata Video ➔
               </span>
               <div className="mt-1 flex items-center gap-1.5">
-                <Star className="w-5 h-5 text-emerald-400 fill-emerald-400" />
+                <Star className="w-5 h-5 text-emerald-400 fill-emerald-400 group-hover:scale-110 transition" />
                 <span className="text-2xl font-black text-emerald-300">
                   {rawVideoAverage > 0
                     ? Number.isInteger(rawVideoAverage)
@@ -632,9 +645,46 @@ export const ArtistDetailView: React.FC<ArtistDetailViewProps> = ({
         </button>
       </div>
 
-      {/* Tab 1: Video Terkait (Grid 2 Kolom Thumbnail dengan Badge Rating) */}
+      {/* Tab 1: Video Terkait (Toggle Grid vs List - Requirement B.2) */}
       {activeSubTab === 'videos' && (
         <div className="space-y-3 animate-in fade-in">
+          {/* Header Bar with Toggle Grid / Ringkas List Option (B.2) */}
+          <div className="p-2.5 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+              <Film className="w-4 h-4 text-indigo-400" />
+              <span>Daftar Video ({linkedVideos.length})</span>
+            </span>
+
+            <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
+              <button
+                type="button"
+                onClick={() => setVideoListMode('grid')}
+                className={`p-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition cursor-pointer ${
+                  videoListMode === 'grid'
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+                title="Tampilan Grid Thumbnail"
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
+                <span className="text-[10px]">Grid</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setVideoListMode('list')}
+                className={`p-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition cursor-pointer ${
+                  videoListMode === 'list'
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+                title="Tampilan Ringkas & Statistik Jelas"
+              >
+                <ListIcon className="w-3.5 h-3.5" />
+                <span className="text-[10px]">Ringkas</span>
+              </button>
+            </div>
+          </div>
+
           {linkedVideos.length === 0 ? (
             <div className="text-center py-12 px-4 rounded-3xl bg-slate-900/50 border border-slate-800/80">
               <Film className="w-10 h-10 text-slate-600 mx-auto mb-2" />
@@ -643,7 +693,7 @@ export const ArtistDetailView: React.FC<ArtistDetailViewProps> = ({
                 Tautkan video ke artis ini saat membuat atau mengubah entri video.
               </p>
             </div>
-          ) : (
+          ) : videoListMode === 'grid' ? (
             <div className="grid grid-cols-2 gap-3">
               {linkedVideos.map((vid) => {
                 const thumb =
@@ -706,6 +756,72 @@ export const ArtistDetailView: React.FC<ArtistDetailViewProps> = ({
                         <span>{vid.singleChoices?.field_status || 'Koleksi'}</span>
                         <ExternalLink className="w-3 h-3 text-indigo-400" />
                       </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            /* SIMPLE RINGKAS LIST VIEW (Requirement B.2) */
+            <div className="space-y-2">
+              {linkedVideos.map((vid) => {
+                const scoreInfo = videoScores?.find((vs) => vs.videoId === vid.id);
+                const roleName = scoreInfo?.roleName || vid.artistRoles?.[artist.id] || 'Artis Utama';
+                const roleWeight = scoreInfo?.weight ?? 100;
+                const performanceP = scoreInfo?.performance ?? 100;
+                const nilaiDidapat = scoreInfo?.scoreObtained ?? vid.overallRating;
+                const formattedScore = Number.isInteger(nilaiDidapat)
+                  ? nilaiDidapat
+                  : nilaiDidapat.toFixed(1);
+
+                const thumb =
+                  vid.metadata?.thumbnailUrl ||
+                  'https://images.unsplash.com/photo-1485846234645-a62644f84728?w=300&auto=format&fit=crop&q=80';
+
+                return (
+                  <div
+                    key={vid.id}
+                    onClick={() => onSelectVideo && onSelectVideo(vid)}
+                    className="p-3 rounded-2xl bg-slate-900 border border-slate-800 hover:border-indigo-500/60 transition cursor-pointer flex items-center justify-between gap-3 shadow-sm group"
+                  >
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <img
+                        src={thumb}
+                        alt={vid.title}
+                        className="w-12 h-12 rounded-xl object-cover bg-slate-950 shrink-0"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src =
+                            'https://images.unsplash.com/photo-1518676590629-3dcbd9c5a5c9?w=300&auto=format&fit=crop&q=80';
+                        }}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <h4 className="text-xs font-bold text-white line-clamp-1 group-hover:text-indigo-300 transition">
+                          {vid.title}
+                        </h4>
+                        <div className="flex items-center gap-2 mt-1 text-[10px] text-slate-400">
+                          <span className="font-semibold text-indigo-300">{roleName} ({roleWeight}%)</span>
+                          <span>•</span>
+                          <span>Performa: {performanceP}%</span>
+                          {vid.releaseDate && (
+                            <>
+                              <span>•</span>
+                              <span>{vid.releaseDate}</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 shrink-0 text-right">
+                      <div className="flex flex-col items-end">
+                        <span className="text-xs font-black text-amber-300 bg-amber-950/80 px-2 py-0.5 rounded-lg border border-amber-800/80">
+                          Didapat: {formattedScore}
+                        </span>
+                        <span className="text-[10px] text-slate-400 mt-0.5">
+                          Rating Video: <strong className="text-emerald-400">{vid.overallRating}</strong>
+                        </span>
+                      </div>
+                      <ExternalLink className="w-4 h-4 text-slate-500 group-hover:text-indigo-400 transition" />
                     </div>
                   </div>
                 );

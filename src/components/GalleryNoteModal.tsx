@@ -41,14 +41,32 @@ export const GalleryNoteModal: React.FC<GalleryNoteModalProps> = ({
   const [isReadOnly, setIsReadOnly] = useState(readOnlyInitial);
   const [title, setTitle] = useState(initialNote?.title || 'Catatan Baru');
   const [blocks, setBlocks] = useState<NoteBlock[]>(
-    initialNote?.blocks || [
+    initialNote?.blocks ? JSON.parse(JSON.stringify(initialNote.blocks)) : [
       { id: 'b_1', type: 'heading', content: 'Judul Utama' },
       { id: 'b_2', type: 'text', content: 'Tuliskan catatan detail di sini...' },
     ]
   );
   const [selectedArtistIds, setSelectedArtistIds] = useState<string[]>(
-    initialNote?.linkedArtistIds || []
+    initialNote?.linkedArtistIds ? [...initialNote.linkedArtistIds] : []
   );
+
+  useEffect(() => {
+    if (isOpen) {
+      if (initialNote) {
+        setTitle(initialNote.title || '');
+        setBlocks(initialNote.blocks ? JSON.parse(JSON.stringify(initialNote.blocks)) : []);
+        setSelectedArtistIds(initialNote.linkedArtistIds ? [...initialNote.linkedArtistIds] : []);
+      } else {
+        setTitle('Catatan Baru');
+        setBlocks([
+          { id: 'b_1', type: 'heading', content: 'Judul Utama' },
+          { id: 'b_2', type: 'text', content: 'Tuliskan catatan detail di sini...' },
+        ]);
+        setSelectedArtistIds([]);
+      }
+      setIsReadOnly(readOnlyInitial);
+    }
+  }, [initialNote, isOpen, readOnlyInitial]);
 
   if (!isOpen) return null;
 
@@ -71,7 +89,7 @@ export const GalleryNoteModal: React.FC<GalleryNoteModalProps> = ({
     const newBlock: NoteBlock = {
       id: `block_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       type,
-      content: type === 'heading' ? 'Sub-judul' : type === 'image' ? 'https://images.unsplash.com/photo-1518676590629-3dcbd9c5a5c9?w=600&auto=format&fit=crop&q=80' : 'Konten blok baru...',
+      content: type === 'heading' ? 'Sub-judul' : type === 'image' ? '' : type === 'quote' ? 'Kutipan inspiratif...' : 'Konten blok baru...',
     };
     setBlocks([...blocks, newBlock]);
   };
@@ -95,7 +113,6 @@ export const GalleryNoteModal: React.FC<GalleryNoteModalProps> = ({
   };
 
   const removeBlock = (id: string) => {
-    if (blocks.length <= 1) return;
     setBlocks(blocks.filter((b) => b.id !== id));
   };
 
@@ -173,9 +190,32 @@ export const GalleryNoteModal: React.FC<GalleryNoteModalProps> = ({
                 }
                 if (block.type === 'image') {
                   return (
-                    <div key={block.id} className="rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 shadow-md">
-                      <img src={block.content} alt="Galeri Catatan" className="w-full h-auto object-cover" />
+                    <div key={block.id} className="rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 shadow-md my-2">
+                      {block.content ? (
+                        <img
+                          src={block.content}
+                          alt="Galeri Catatan"
+                          referrerPolicy="no-referrer"
+                          className="w-full h-auto max-h-[500px] object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src =
+                              'https://images.unsplash.com/photo-1518676590629-3dcbd9c5a5c9?w=600&auto=format&fit=crop&q=80';
+                          }}
+                        />
+                      ) : (
+                        <div className="p-4 text-center text-xs text-slate-500 italic">Gambar tidak tersedia</div>
+                      )}
                     </div>
+                  );
+                }
+                if (block.type === 'quote') {
+                  return (
+                    <blockquote
+                      key={block.id}
+                      className="p-3 my-2 border-l-4 border-indigo-500 bg-slate-950/80 rounded-r-xl text-xs text-indigo-200 italic"
+                    >
+                      "{block.content}"
+                    </blockquote>
                   );
                 }
                 if (block.type === 'bullet_list') {
@@ -246,6 +286,15 @@ export const GalleryNoteModal: React.FC<GalleryNoteModalProps> = ({
                 >
                   <List className="w-3.5 h-3.5" />
                   <span>List</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => addBlock('quote')}
+                  className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-xs font-bold text-amber-300 flex items-center gap-1 border border-slate-800 cursor-pointer"
+                  title="Tambah Kutipan"
+                >
+                  <Quote className="w-3.5 h-3.5" />
+                  <span>Kutipan</span>
                 </button>
                 <button
                   type="button"
