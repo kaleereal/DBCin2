@@ -767,7 +767,7 @@ export const ArtistDetailView: React.FC<ArtistDetailViewProps> = ({
             </div>
           </div>
 
-          {/* Table Container (Mobile-Friendly Responsive Table) */}
+          {/* Table Container (Mobile-Optimized Table) */}
           {sortedPerformanceList.length === 0 ? (
             <div className="text-center py-12 px-4 rounded-3xl bg-slate-900/50 border border-slate-800/80">
               <Film className="w-10 h-10 text-slate-600 mx-auto mb-2" />
@@ -778,11 +778,11 @@ export const ArtistDetailView: React.FC<ArtistDetailViewProps> = ({
               <table className="w-full text-left text-xs text-slate-300">
                 <thead className="bg-slate-950/80 text-[10px] text-slate-400 uppercase tracking-wider border-b border-slate-800">
                   <tr>
-                    <th className="p-3">Video</th>
-                    <th className="p-3">Kolaborator</th>
-                    <th className="p-3">Rilis</th>
-                    <th className="p-3">Peran</th>
-                    <th className="p-3 text-right">Nilai Performa &amp; Hasil</th>
+                    <th className="p-2 sm:p-3">Video</th>
+                    <th className="p-2 sm:p-3">Kolaborator</th>
+                    <th className="p-2 sm:p-3">Rilis</th>
+                    <th className="p-2 sm:p-3">Peran</th>
+                    <th className="p-2 sm:p-3 text-right">Nilai &amp; Performa</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60 font-medium">
@@ -797,42 +797,42 @@ export const ArtistDetailView: React.FC<ArtistDetailViewProps> = ({
                         className="hover:bg-slate-850/60 transition cursor-pointer"
                       >
                         {/* Thumbnail & Judul */}
-                        <td className="p-3 min-w-[160px]">
-                          <div className="flex items-center gap-2.5">
+                        <td className="p-2 sm:p-3 min-w-[120px] sm:min-w-[160px]">
+                          <div className="flex items-center gap-2">
                             <img
                               src={thumb}
                               alt={item.video.title}
-                              className="w-10 h-10 rounded-lg object-cover bg-slate-950 shrink-0"
+                              className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg object-cover bg-slate-950 shrink-0"
                             />
-                            <span className="font-bold text-white line-clamp-2 leading-tight">
+                            <span className="font-bold text-white line-clamp-2 text-[11px] sm:text-xs leading-tight">
                               {item.video.title}
                             </span>
                           </div>
                         </td>
 
                         {/* Kolaborator */}
-                        <td className="p-3 min-w-[120px] text-[11px] text-slate-400">
+                        <td className="p-2 sm:p-3 min-w-[90px] sm:min-w-[120px] text-[10px] sm:text-[11px] text-slate-400">
                           {item.collaborators.length > 0 ? item.collaborators.join(', ') : 'Solo / Utama'}
                         </td>
 
                         {/* Tanggal Rilis */}
-                        <td className="p-3 whitespace-nowrap text-[11px] text-slate-400">
+                        <td className="p-2 sm:p-3 whitespace-nowrap text-[10px] sm:text-[11px] text-slate-400">
                           {rilisText}
                         </td>
 
                         {/* Peran */}
-                        <td className="p-3 whitespace-nowrap font-bold text-indigo-300">
+                        <td className="p-2 sm:p-3 whitespace-nowrap font-bold text-indigo-300 text-[11px] sm:text-xs">
                           {item.roleName}
                         </td>
 
                         {/* Nilai Performa (P) dan Nilai Didapat Artis */}
-                        <td className="p-3 text-right whitespace-nowrap">
+                        <td className="p-2 sm:p-3 text-right whitespace-nowrap">
                           <div className="flex flex-col items-end">
-                            <span className="text-xs font-black text-amber-300 bg-amber-950/80 px-2 py-0.5 rounded border border-amber-800/80">
+                            <span className="text-[10px] sm:text-xs font-black text-amber-300 bg-amber-950/80 px-1.5 sm:px-2 py-0.5 rounded border border-amber-800/80">
                               Didapat: {item.scoreObtained}
                             </span>
-                            <span className="text-[10px] text-slate-400 mt-0.5 font-semibold">
-                              Performa (P): {item.performance}%
+                            <span className="text-[9px] sm:text-[10px] text-slate-400 mt-0.5 font-semibold">
+                              Performa: {item.performance}%
                             </span>
                           </div>
                         </td>

@@ -796,12 +796,14 @@ export const VideoFormModal: React.FC<VideoFormModalProps> = ({
                                     ...prev,
                                     [artist.id]: val, // Supports empty string!
                                   }));
-                                  // Update performance slider default to new role's S weight if not customized
-                                  const newS = getRoleWeightS(val);
-                                  setArtistPerformances((prev) => ({
-                                    ...prev,
-                                    [artist.id]: newS,
-                                  }));
+                                  // Hanya berikan default jika nilai performa belum pernah di-set
+                                  if (artistPerformances[artist.id] === undefined) {
+                                    const newS = getRoleWeightS(val);
+                                    setArtistPerformances((prev) => ({
+                                      ...prev,
+                                      [artist.id]: newS,
+                                    }));
+                                  }
                                 }}
                                 placeholder="Kosongkan atau ketik status peran..."
                                 className="w-full min-h-[38px] px-3 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"

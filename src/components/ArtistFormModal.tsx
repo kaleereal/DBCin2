@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Plus, Trash2, Check, Image as ImageIcon, Link as LinkIcon, Info, Upload, AlertCircle } from 'lucide-react';
-import { Artist, ArtistLink, GalleryNote } from '../types';
-import { getStoredGalleryNotes, saveGalleryNotes } from '../utils/storage';
+import { Artist, ArtistLink, GalleryNote, CustomFieldDefinition } from '../types';
+import { getStoredGalleryNotes, saveGalleryNotes, getStoredArtistFields } from '../utils/storage';
 import { GalleryNoteModal } from './GalleryNoteModal';
 
 interface ArtistFormModalProps {
@@ -29,12 +29,16 @@ export const ArtistFormModal: React.FC<ArtistFormModalProps> = ({
   const [embedUrlError, setEmbedUrlError] = useState('');
   const [formError, setFormError] = useState('');
   const [roleText, setRoleText] = useState('');
+  const [customFields, setCustomFields] = useState<Record<string, any>>({});
+  const [artistFieldDefs, setArtistFieldDefs] = useState<CustomFieldDefinition[]>([]);
 
   const [availableGalleryNotes, setAvailableGalleryNotes] = useState<GalleryNote[]>([]);
   const [isCreatingDirectNote, setIsCreatingDirectNote] = useState(false);
 
   useEffect(() => {
     setAvailableGalleryNotes(getStoredGalleryNotes());
+    setArtistFieldDefs(getStoredArtistFields());
+
     if (initialArtist) {
       setName(initialArtist.name || '');
       setAvatarUrl(initialArtist.avatarUrl || '');
@@ -45,6 +49,7 @@ export const ArtistFormModal: React.FC<ArtistFormModalProps> = ({
       setLinks(initialArtist.links || []);
       setEmbedImages(initialArtist.embedImages || []);
       setRoleText(initialArtist.textFields?.['Peran Utama'] || '');
+      setCustomFields(initialArtist.textFields || {});
     } else {
       setName('');
       setAvatarUrl('https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80');
@@ -55,6 +60,7 @@ export const ArtistFormModal: React.FC<ArtistFormModalProps> = ({
       setLinks([]);
       setEmbedImages([]);
       setRoleText('');
+      setCustomFields({});
     }
     setNewEmbedUrl('');
     setEmbedUrlError('');
@@ -166,6 +172,11 @@ export const ArtistFormModal: React.FC<ArtistFormModalProps> = ({
       }
     }
 
+    const updatedTextFields = {
+      ...customFields,
+      'Peran Utama': roleText.trim() || 'Aktor / Seniman Film',
+    };
+
     const payload: Partial<Artist> = {
       name: name.trim(),
       avatarUrl:
@@ -177,9 +188,7 @@ export const ArtistFormModal: React.FC<ArtistFormModalProps> = ({
       galleryNoteIds: selectedGalleryNoteIds,
       links,
       embedImages: finalEmbedImages,
-      textFields: {
-        'Peran Utama': roleText.trim() || 'Aktor / Seniman Film',
-      },
+      textFields: updatedTextFields,
       updatedAt: new Date().toISOString(),
     };
 
@@ -245,6 +254,26 @@ export const ArtistFormModal: React.FC<ArtistFormModalProps> = ({
               className="w-full min-h-[48px] px-3.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
+
+          {/* Dynamic Extra Custom Fields configured from "Struktur & Urutan Field Artis" */}
+          {artistFieldDefs
+            .filter((f) => !f.isSystem && f.type !== 'gallery_notes' && f.type !== 'month_year' && f.type !== 'button_link')
+            .map((field) => (
+              <div key={field.id} className="space-y-1.5">
+                <label className="text-sm font-bold text-slate-200">{field.label}</label>
+                {field.description && <p className="text-xs text-slate-400">{field.description}</p>}
+                <input
+                  type={field.type === 'number' || field.type === 'custom_number' ? 'number' : 'text'}
+                  value={customFields[field.label] !== undefined ? customFields[field.label] : (field.type === 'number' || field.type === 'custom_number' ? 0 : '')}
+                  onChange={(e) => {
+                    const val = field.type === 'number' || field.type === 'custom_number' ? Number(e.target.value) || 0 : e.target.value;
+                    setCustomFields((prev) => ({ ...prev, [field.label]: val }));
+                  }}
+                  placeholder={`Masukkan ${field.label}...`}
+                  className="w-full min-h-[48px] px-3.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+            ))}
 
           {/* Field Bulan-Tahun Lahir (Month/Year) - WAJIB ADA (Poin 5A.3) */}
           <div className="space-y-1.5">

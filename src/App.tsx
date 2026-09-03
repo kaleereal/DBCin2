@@ -324,6 +324,23 @@ export default function App() {
               </p>
             </div>
           </button>
+
+          {/* Akses Cepat Halaman "Catatan Gallery" (Poin 4) */}
+          <button
+            onClick={() => {
+              setSelectedArtistId(null);
+              setSelectedVideoId(null);
+              setActiveTab('gallery_notes');
+            }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition active:scale-95 cursor-pointer ${
+              activeTab === 'gallery_notes'
+                ? 'bg-indigo-600 border-indigo-500 text-white shadow-md'
+                : 'bg-slate-900 border-slate-800 text-slate-300 hover:text-white hover:border-slate-700'
+            }`}
+          >
+            <Film className="w-3.5 h-3.5 text-indigo-400" />
+            <span>Catatan Gallery</span>
+          </button>
         </header>
 
         {/* Dynamic Main View Content */}
